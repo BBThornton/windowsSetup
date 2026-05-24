@@ -254,10 +254,20 @@ button {
 .workspace-windows {
   display: inline-flex;
   flex: 0 0 auto;
-  gap: 2px;
+  align-items: center;
+  gap: 4px;
   max-width: none;
   color: var(--blue);
   white-space: nowrap;
+}
+
+.workspace-window-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 18px;
+  line-height: 1;
 }
 
 .clock {

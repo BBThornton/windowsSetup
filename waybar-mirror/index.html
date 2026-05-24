@@ -366,7 +366,12 @@
           if (windows.length > 0) {
             const icons = document.createElement("span");
             icons.className = "workspace-windows";
-            icons.textContent = windows.slice(0, 4).map(getWindowIcon).join("");
+            windows.slice(0, 4).forEach((windowLike) => {
+              const icon = document.createElement("span");
+              icon.className = "workspace-window-icon";
+              icon.textContent = getWindowIcon(windowLike);
+              icons.append(icon);
+            });
             button.append(" ", icons);
           }
 
