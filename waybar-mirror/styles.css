@@ -270,6 +270,20 @@ button {
   line-height: 1;
 }
 
+.awake {
+  color: var(--yellow);
+}
+
+.awake.muted {
+  color: var(--muted);
+}
+
+.awake img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
 .clock {
   display: inline-flex;
   align-items: center;

@@ -41,7 +41,7 @@
         <span class="separator">·</span>
         <span id="weather" class="module weather muted">󰖐</span>
         <span class="separator">·</span>
-        <span class="icon-button" title="Idle inhibitor placeholder"></span>
+        <button id="awake" class="icon-button awake muted" title="PowerToys Awake not detected"></button>
       </section>
 
       <section class="right">
@@ -102,6 +102,7 @@
 
       const elements = {
         audio: document.getElementById("audio"),
+        awake: document.getElementById("awake"),
         battery: document.getElementById("battery"),
         clock: document.getElementById("clock"),
         cpu: document.getElementById("cpu"),
@@ -124,6 +125,7 @@
 
       let currentOutput = providers.outputMap;
       let previousPlaybackVolume = 40;
+      let previousAwakeSignature = "";
       let previousWorkspaceSignature = "";
       let previousTraySignature = "";
       let isTrayExpanded = false;
@@ -321,8 +323,18 @@
           /\bspeaker\b/,
           /\bspeakers\b/,
           /realtek.*audio/,
-          /sound.*output/
+          /sound.*output/,
+          /powertoys awake/,
+          /power toys awake/,
+          /\bawake\b/
         ].some((pattern) => pattern.test(text));
+      }
+
+      function getAwakeTrayIcon(systray) {
+        return (systray?.items ?? systray?.icons ?? []).find((item) => {
+          const text = getTraySearchText(item);
+          return /powertoys awake|power toys awake|\bawake\b/.test(text);
+        });
       }
 
       function getWorkspaces(glazewm) {
@@ -341,6 +353,7 @@
         updateWorkspaces(output.glazewm);
         updateClock(output.date);
         updateWeather(output.weather);
+        updateAwake(output.systray);
         updateTray(output.systray);
         updateNetwork(output.network);
         updateMobo(output);
@@ -416,6 +429,41 @@
         setText(elements.weather, temperature == null ? icon : `${icon} ${Math.round(temperature)}C`);
       }
 
+      function updateAwake(systray) {
+        const item = getAwakeTrayIcon(systray);
+        const signature = JSON.stringify(item ? [item.id, item.iconHash, item.iconUrl, item.tooltip ?? item.title] : null);
+        if (signature === previousAwakeSignature) return;
+        previousAwakeSignature = signature;
+
+        const awakeButton = elements.awake.cloneNode(false);
+        elements.awake.replaceWith(awakeButton);
+        elements.awake = awakeButton;
+        elements.awake.replaceChildren();
+
+        if (!item) {
+          elements.awake.removeAttribute("data-tray-icon");
+          elements.awake.title = "PowerToys Awake not detected";
+          elements.awake.textContent = "";
+          setClassFlag(elements.awake, "muted", true);
+          return;
+        }
+
+        elements.awake.dataset.trayIcon = item.id;
+        elements.awake.title = item.tooltip ?? item.title ?? "PowerToys Awake";
+        setClassFlag(elements.awake, "muted", false);
+
+        if (item.iconUrl) {
+          const image = document.createElement("img");
+          image.src = item.iconUrl;
+          image.alt = "";
+          elements.awake.append(image);
+        } else {
+          elements.awake.textContent = "";
+        }
+
+        wireTrayIconEvents(elements.awake, item, systray);
+      }
+
       function updateTray(systray) {
         const items = (systray?.items ?? systray?.icons ?? []).filter((item) => !isHiddenTrayIcon(item));
         const compactItems = items.slice(0, visibleTrayIconCount);
@@ -458,10 +506,17 @@
           icon.textContent = item.icon ?? "●";
         }
 
+        wireTrayIconEvents(icon, item, systray);
+
+        return icon;
+      }
+
+      function wireTrayIconEvents(icon, item, systray) {
         icon.addEventListener("click", () => systray?.onLeftClick?.(item.id));
         icon.addEventListener("dblclick", () => systray?.onLeftDoubleClick?.(item.id));
         icon.addEventListener("contextmenu", (event) => {
           event.preventDefault();
+          event.stopPropagation();
           systray?.onRightClick?.(item.id);
         });
         icon.addEventListener("auxclick", (event) => {
@@ -482,8 +537,6 @@
             systray?.onHoverMove?.(item.id);
           });
         });
-
-        return icon;
       }
 
       function updateNetwork(network) {
