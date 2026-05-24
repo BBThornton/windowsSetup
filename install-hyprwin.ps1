@@ -246,10 +246,13 @@ function Install-AltSnap {
 
   Write-Host "Resolving latest AltSnap release..."
   $Release = Invoke-RestMethod -Uri $AltSnapUrl -UseBasicParsing
-  $Asset = $Release.assets | Where-Object { $_.name -eq "AltSnap.exe" } | Select-Object -First 1
+  $Asset = $Release.assets |
+    Where-Object { $_.name -like "AltSnap*.exe" -and $_.name -notlike "*Setup*" } |
+    Select-Object -First 1
 
   if (-not $Asset) {
-    throw "Could not find AltSnap.exe in the latest GitHub release. Check https://github.com/RamonUnch/AltSnap/releases"
+    $Names = ($Release.assets | ForEach-Object { $_.name }) -join ", "
+    throw "Could not find AltSnap exe in the latest GitHub release. Available assets: $Names"
   }
 
   Write-Host "Downloading AltSnap $($Release.tag_name)..."
