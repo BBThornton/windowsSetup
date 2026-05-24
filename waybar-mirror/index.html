@@ -128,6 +128,7 @@
       let previousTraySignature = "";
       let isTrayExpanded = false;
       const visibleTrayIconCount = 4;
+      const volumeStep = 5;
 
       function spawnShell(program, args = "") {
         if (!zebar.shellSpawn) {
@@ -580,6 +581,12 @@
         runShellAction("audioSettings");
       });
 
+      elements.audio.addEventListener("wheel", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        adjustPlaybackVolume(event.deltaY < 0 ? volumeStep : -volumeStep);
+      });
+
       bar.addEventListener("auxclick", (event) => {
         const eventTarget = event.target instanceof Element ? event.target : event.target.parentElement;
         const target = eventTarget?.closest("[data-workspace]");
@@ -630,6 +637,25 @@
         }
 
         audio.setVolume(Math.max(previousPlaybackVolume, 20));
+      }
+
+      function adjustPlaybackVolume(delta) {
+        const audio = currentOutput.audio;
+        const playback = audio?.defaultPlaybackDevice;
+
+        if (!playback || !audio?.setVolume) {
+          runShellAction("audioSettings");
+          return;
+        }
+
+        const nextVolume = Math.max(0, Math.min(100, Math.round(getDeviceVolume(playback) + delta)));
+        if (nextVolume > 0) previousPlaybackVolume = nextVolume;
+
+        if (audio?.setMute && playback.isMuted && nextVolume > 0) {
+          audio.setMute(false, { deviceId: getDeviceId(playback) });
+        }
+
+        audio.setVolume(nextVolume, { deviceId: getDeviceId(playback) });
       }
 
       providers.onOutput(() => update({ ...providers.outputMap }));
