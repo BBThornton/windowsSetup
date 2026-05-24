@@ -24,7 +24,15 @@
             "argsRegex": ".*"
           },
           {
+            "program": "powershell.exe",
+            "argsRegex": ".*"
+          },
+          {
             "program": "explorer",
+            "argsRegex": ".*"
+          },
+          {
+            "program": "explorer.exe",
             "argsRegex": ".*"
           },
           {
@@ -32,7 +40,15 @@
             "argsRegex": ".*"
           },
           {
+            "program": "wt.exe",
+            "argsRegex": ".*"
+          },
+          {
             "program": "rundll32.exe",
+            "argsRegex": ".*"
+          },
+          {
+            "program": "taskmgr.exe",
             "argsRegex": ".*"
           }
         ]

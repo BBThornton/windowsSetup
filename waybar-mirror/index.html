@@ -56,17 +56,19 @@
 
       function runShellAction(actionName) {
         const actions = {
-          launcher: ["powershell", "-WindowStyle Hidden -Command Start-Process 'ms-windows-search:'"],
-          theme: ["explorer", "ms-settings:personalization-colors"],
-          files: ["explorer", ""],
-          terminal: ["wt", ""],
-          browser: ["explorer", "https://"],
-          settings: ["explorer", "ms-settings:"],
-          notifications: ["explorer", "ms-actioncenter:"],
-          update: ["explorer", "ms-settings:windowsupdate"],
-          trayFlyout: ["explorer", "shell:::{05d7b0f4-2121-4eff-bf6b-ed3f69b894d9}"],
-          wifi: ["powershell", "-WindowStyle Hidden -Command Start-Process 'ms-availablenetworks:'"],
-          nightlight: ["explorer", "ms-settings:nightlight"],
+          launcher: ["powershell.exe", "-WindowStyle Hidden -Command Start-Process 'ms-windows-search:'"],
+          theme: ["explorer.exe", "ms-settings:personalization-colors"],
+          files: ["explorer.exe", ""],
+          terminal: ["wt.exe", ""],
+          browser: ["explorer.exe", "https://"],
+          settings: ["explorer.exe", "ms-settings:"],
+          notifications: ["explorer.exe", "ms-actioncenter:"],
+          update: ["explorer.exe", "ms-settings:windowsupdate"],
+          trayFlyout: ["explorer.exe", "shell:::{05d7b0f4-2121-4eff-bf6b-ed3f69b894d9}"],
+          wifi: ["powershell.exe", "-WindowStyle Hidden -Command Start-Process 'ms-availablenetworks:'"],
+          audioSettings: ["explorer.exe", "ms-settings:sound"],
+          taskManager: ["taskmgr.exe", ""],
+          nightlight: ["explorer.exe", "ms-settings:nightlight"],
           lock: ["rundll32.exe", "user32.dll,LockWorkStation"]
         };
         const [program, args] = actions[actionName] ?? [];
@@ -121,7 +123,7 @@
       }
 
       function getVolumeIcon(device) {
-        const volume = device?.volume ?? 0;
+        const volume = getDeviceVolume(device);
         if (!device || device.isMuted || volume === 0) return "󰖁";
         if (volume < 33) return "";
         if (volume < 66) return "";
@@ -208,10 +210,10 @@
         const visibleItems = items.slice(0, 10);
         const overflowCount = Math.max(0, items.length - visibleItems.length);
 
-        return `${visibleItems.map((item, index) => `
-          <span class="tray-icon" title="${escapeHtml(item.tooltip ?? item.title ?? "")}">
+        return `${visibleItems.map((item) => `
+          <button class="tray-icon" type="button" data-tray-icon="${escapeHtml(item.id ?? "")}" title="${escapeHtml(item.tooltip ?? item.title ?? "")}">
             ${item.iconUrl ? `<img src="${escapeHtml(item.iconUrl)}" alt="" />` : `<span>${escapeHtml(item.icon ?? "●")}</span>`}
-          </span>
+          </button>
         `).join("")}${overflowCount ? `<span class="tray-more" title="${overflowCount} hidden tray icons">+${overflowCount}</span>` : ""}`;
       }
 
@@ -230,6 +232,8 @@
         const weatherTemp = currentWeather?.temperatureCelsius ?? currentWeather?.temperature?.celsius ?? currentWeather?.tempC;
         const weatherLabel = weatherTemp == null ? "󰖐" : `󰖐 ${Math.round(weatherTemp)}C`;
         const capsActive = output.keyboard?.capsLock || output.keyboard?.capslock;
+        const playbackVolume = getDeviceVolume(playback);
+        const recordingVolume = getDeviceVolume(recording);
 
         bar.innerHTML = `
           <section class="left">
@@ -275,11 +279,11 @@
             </button>
             <span class="separator">·</span>
             <div class="drawer mobo-drawer">
-              <span class="module temperature ${(output.cpu?.usage ?? 0) > 90 ? "critical" : ""}">󰈸</span>
+              <button class="module temperature ${(output.cpu?.usage ?? 0) > 90 ? "critical" : ""}" data-shell="taskManager" title="Open Task Manager">󰈸</button>
               <div class="drawer-panel from-right">
-                <span class="module cpu ${(output.cpu?.usage ?? 0) > 90 ? "critical" : (output.cpu?.usage ?? 0) > 70 ? "warning" : ""}">
+                <button class="module cpu ${(output.cpu?.usage ?? 0) > 90 ? "critical" : (output.cpu?.usage ?? 0) > 70 ? "warning" : ""}" data-shell="taskManager" title="Open Task Manager">
                   ${Math.round(output.cpu?.usage ?? 0)}% 󰍛
-                </span>
+                </button>
                 <span class="module power-profile"></span>
                 <span class="module memory">${formatUsedMemory(output.memory)} 󰾆</span>
                 ${diskUsage == null ? "" : `<span class="module disk">${diskUsage}% 󰋊</span>`}
@@ -288,12 +292,12 @@
             </div>
             <span class="separator">|</span>
             <div class="drawer audio-drawer">
-              <button class="module audio ${playback?.isMuted ? "muted" : ""}" data-action="audio-mute" title="${escapeHtml(playback?.name ?? "Audio")}">
-                ${getVolumeIcon(playback)} ${playback?.isMuted ? "" : `${Math.round(playback?.volume ?? 0)}%`}
+              <button class="module audio ${playbackVolume === 0 ? "muted" : ""}" data-action="audio-toggle" title="Mute/unmute audio">
+                ${getVolumeIcon(playback)} ${playbackVolume === 0 ? "" : `${Math.round(playbackVolume)}%`}
               </button>
               <div class="drawer-panel from-right compact-panel">
-                <button class="module mic ${recording?.isMuted ? "muted" : ""}" data-action="mic-mute" title="${escapeHtml(recording?.name ?? "Microphone")}">
-                  ${recording?.isMuted ? "" : ""} ${Math.round(recording?.volume ?? 0)}%
+                <button class="module mic ${recordingVolume === 0 ? "muted" : ""}" data-shell="audioSettings" title="Open sound settings">
+                  ${recordingVolume === 0 ? "" : ""} ${Math.round(recordingVolume)}%
                 </button>
               </div>
             </div>
@@ -316,7 +320,7 @@
 
       bar.addEventListener("click", (event) => {
         const eventTarget = event.target instanceof Element ? event.target : event.target.parentElement;
-        const target = eventTarget?.closest("[data-workspace], [data-action], [data-shell]");
+        const target = eventTarget?.closest("[data-workspace], [data-action], [data-shell], [data-tray-icon]");
 
         if (!target) {
           return;
@@ -330,24 +334,96 @@
           return;
         }
 
+        if (target.dataset.trayIcon) {
+          currentOutput.systray?.onLeftClick?.(target.dataset.trayIcon);
+          return;
+        }
+
         if (target.dataset.action === "media-play-pause") {
           currentOutput.media?.playPause?.();
           return;
         }
 
-        if (target.dataset.action === "audio-mute") {
-          currentOutput.audio?.toggleMute?.();
-          return;
-        }
-
-        if (target.dataset.action === "mic-mute") {
-          currentOutput.audio?.toggleMute?.({ deviceType: "recording" });
+        if (target.dataset.action === "audio-toggle") {
+          togglePlaybackVolume();
           return;
         }
 
         if (target.dataset.shell) {
           runShellAction(target.dataset.shell);
         }
+      });
+
+      bar.addEventListener("dblclick", (event) => {
+        const eventTarget = event.target instanceof Element ? event.target : event.target.parentElement;
+        const target = eventTarget?.closest("[data-tray-icon]");
+
+        if (!target?.dataset.trayIcon) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        currentOutput.systray?.onLeftDoubleClick?.(target.dataset.trayIcon);
+      });
+
+      bar.addEventListener("contextmenu", (event) => {
+        const eventTarget = event.target instanceof Element ? event.target : event.target.parentElement;
+        const target = eventTarget?.closest("[data-tray-icon]");
+
+        if (!target?.dataset.trayIcon) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        currentOutput.systray?.onRightClick?.(target.dataset.trayIcon);
+      });
+
+      bar.addEventListener("auxclick", (event) => {
+        const eventTarget = event.target instanceof Element ? event.target : event.target.parentElement;
+        const target = eventTarget?.closest("[data-tray-icon]");
+
+        if (!target?.dataset.trayIcon || event.button !== 1) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        currentOutput.systray?.onMiddleClick?.(target.dataset.trayIcon);
+      });
+
+      bar.addEventListener("mouseover", (event) => {
+        const eventTarget = event.target instanceof Element ? event.target : event.target.parentElement;
+        const target = eventTarget?.closest("[data-tray-icon]");
+
+        if (!target?.dataset.trayIcon || (event.relatedTarget instanceof Node && target.contains(event.relatedTarget))) {
+          return;
+        }
+
+        currentOutput.systray?.onHoverEnter?.(target.dataset.trayIcon);
+      });
+
+      bar.addEventListener("mouseout", (event) => {
+        const eventTarget = event.target instanceof Element ? event.target : event.target.parentElement;
+        const target = eventTarget?.closest("[data-tray-icon]");
+
+        if (!target?.dataset.trayIcon || (event.relatedTarget instanceof Node && target.contains(event.relatedTarget))) {
+          return;
+        }
+
+        currentOutput.systray?.onHoverLeave?.(target.dataset.trayIcon);
+      });
+
+      bar.addEventListener("mousemove", (event) => {
+        const eventTarget = event.target instanceof Element ? event.target : event.target.parentElement;
+        const target = eventTarget?.closest("[data-tray-icon]");
+
+        if (!target?.dataset.trayIcon) {
+          return;
+        }
+
+        currentOutput.systray?.onHoverMove?.(target.dataset.trayIcon);
       });
 
       bar.addEventListener("wheel", (event) => {
@@ -358,6 +434,31 @@
           runGlazeCommand(event.deltaY > 0 ? "focus-next-workspace" : "focus-prev-workspace");
         }
       });
+
+      let previousPlaybackVolume = 40;
+
+      function getDeviceVolume(device) {
+        return device?.volume ?? device?.volumePercent ?? 0;
+      }
+
+      function togglePlaybackVolume() {
+        const audio = currentOutput.audio;
+        const playback = audio?.defaultPlaybackDevice;
+        const currentVolume = getDeviceVolume(playback);
+
+        if (!audio?.setVolume) {
+          runShellAction("audioSettings");
+          return;
+        }
+
+        if (currentVolume > 0) {
+          previousPlaybackVolume = currentVolume;
+          audio.setVolume(0);
+          return;
+        }
+
+        audio.setVolume(Math.max(previousPlaybackVolume, 20));
+      }
 
       providers.onOutput(() => render({ ...providers.outputMap }));
       render(providers.outputMap);

@@ -123,7 +123,8 @@ button {
 
 [data-shell],
 [data-action],
-[data-workspace] {
+[data-workspace],
+[data-tray-icon] {
   cursor: pointer;
 }
 
