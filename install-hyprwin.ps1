@@ -131,6 +131,24 @@ function Test-JetBrainsMonoNerdFontInstalled {
   return $false
 }
 
+function Install-FontFile {
+  param(
+    [Parameter(Mandatory)] [System.IO.FileInfo]$FontFile,
+    [Parameter(Mandatory)] [string]$FontInstallRoot,
+    [Parameter(Mandatory)] [string]$RegistryPath
+  )
+
+  $Destination = Join-Path $FontInstallRoot $FontFile.Name
+  Copy-Item -LiteralPath $FontFile.FullName -Destination $Destination -Force
+
+  $FontType = if ($FontFile.Extension -eq ".otf") { "OpenType" } else { "TrueType" }
+  $RegistryName = "JetBrainsMono Nerd Font $($FontFile.BaseName) ($FontType)"
+
+  New-ItemProperty -Path $RegistryPath -Name $RegistryName -Value $Destination -PropertyType String -Force | Out-Null
+
+  return $Destination
+}
+
 function Install-JetBrainsMonoNerdFont {
   if (Test-JetBrainsMonoNerdFontInstalled) {
     Write-Host "JetBrainsMono Nerd Font is already installed. Skipping font download."
@@ -152,21 +170,48 @@ function Install-JetBrainsMonoNerdFont {
   Expand-Archive -LiteralPath $ZipPath -DestinationPath $ExtractRoot -Force
 
   $FontFiles = Get-ChildItem -LiteralPath $ExtractRoot -Recurse -File |
-    Where-Object { $_.Extension -in @(".ttf", ".otf") -and $_.Name -notmatch "Windows Compatible" }
+    Where-Object {
+      $_.Extension -in @(".ttf", ".otf") -and
+      $_.BaseName -like "JetBrainsMonoNerdFont*" -and
+      $_.Name -match "Windows Compatible"
+    }
 
   if (-not $FontFiles) {
-    throw "Downloaded JetBrainsMono Nerd Font archive did not contain installable font files."
+    $FontFiles = Get-ChildItem -LiteralPath $ExtractRoot -Recurse -File |
+      Where-Object { $_.Extension -in @(".ttf", ".otf") -and $_.BaseName -like "JetBrainsMonoNerdFont*" }
   }
+
+  if (-not $FontFiles) {
+    throw "Downloaded JetBrainsMono Nerd Font archive did not contain JetBrainsMono Nerd Font files."
+  }
+
+  $RegularFont = $FontFiles |
+    Where-Object { $_.BaseName -match "^JetBrainsMonoNerdFont-Regular" } |
+    Select-Object -First 1
 
   foreach ($FontFile in $FontFiles) {
-    $Destination = Join-Path $FontInstallRoot $FontFile.Name
-    Copy-Item -LiteralPath $FontFile.FullName -Destination $Destination -Force
-
-    $FontType = if ($FontFile.Extension -eq ".otf") { "OpenType" } else { "TrueType" }
-    $RegistryName = "JetBrainsMono Nerd Font $($FontFile.BaseName) ($FontType)"
-
-    New-ItemProperty -Path $RegistryPath -Name $RegistryName -Value $Destination -PropertyType String -Force | Out-Null
+    Install-FontFile -FontFile $FontFile -FontInstallRoot $FontInstallRoot -RegistryPath $RegistryPath | Out-Null
   }
+
+  if ($RegularFont) {
+    $RegularDestination = Join-Path $FontInstallRoot $RegularFont.Name
+    New-ItemProperty -Path $RegistryPath -Name "JetBrainsMono Nerd Font (TrueType)" -Value $RegularDestination -PropertyType String -Force | Out-Null
+  }
+
+  Add-Type -Namespace Win32 -Name NativeMethods -MemberDefinition @"
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError=true, CharSet=System.Runtime.InteropServices.CharSet.Auto)]
+    public static extern System.IntPtr SendMessageTimeout(
+      System.IntPtr hWnd,
+      uint Msg,
+      System.IntPtr wParam,
+      string lParam,
+      uint fuFlags,
+      uint uTimeout,
+      out System.IntPtr lpdwResult);
+"@
+
+  $Result = [IntPtr]::Zero
+  [Win32.NativeMethods]::SendMessageTimeout([IntPtr]0xffff, 0x001D, [IntPtr]::Zero, "Fonts", 0x0002, 1000, [ref]$Result) | Out-Null
 
   Remove-Item -LiteralPath $TempRoot -Recurse -Force
   Write-Host "Installed JetBrainsMono Nerd Font for the current user."

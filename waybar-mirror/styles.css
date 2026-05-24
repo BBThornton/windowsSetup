@@ -111,7 +111,7 @@ button {
 .icon-button,
 .player,
 .workspace,
-.tray-button {
+.tray-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -123,8 +123,7 @@ button {
 
 [data-shell],
 [data-action],
-[data-workspace],
-[data-tray-index] {
+[data-workspace] {
   cursor: pointer;
 }
 
@@ -268,13 +267,13 @@ button {
   overflow: hidden;
 }
 
-.tray-button {
+.tray-icon {
   width: 22px;
   height: 22px;
   padding: 2px;
 }
 
-.tray-button img {
+.tray-icon img {
   width: 16px;
   height: 16px;
   object-fit: contain;
@@ -344,6 +343,10 @@ button {
 
 .nightlight {
   color: var(--yellow);
+}
+
+.tray-flyout {
+  color: var(--muted);
 }
 
 .lock {

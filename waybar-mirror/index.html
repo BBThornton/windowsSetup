@@ -64,6 +64,7 @@
           settings: ["explorer", "ms-settings:"],
           notifications: ["explorer", "ms-actioncenter:"],
           update: ["explorer", "ms-settings:windowsupdate"],
+          trayFlyout: ["explorer", "shell:::{05d7b0f4-2121-4eff-bf6b-ed3f69b894d9}"],
           wifi: ["powershell", "-WindowStyle Hidden -Command Start-Process 'ms-availablenetworks:'"],
           nightlight: ["explorer", "ms-settings:nightlight"],
           lock: ["rundll32.exe", "user32.dll,LockWorkStation"]
@@ -208,9 +209,9 @@
         const overflowCount = Math.max(0, items.length - visibleItems.length);
 
         return `${visibleItems.map((item, index) => `
-          <button class="tray-button" data-tray-index="${index}" title="${escapeHtml(item.tooltip ?? item.title ?? "")}">
+          <span class="tray-icon" title="${escapeHtml(item.tooltip ?? item.title ?? "")}">
             ${item.iconUrl ? `<img src="${escapeHtml(item.iconUrl)}" alt="" />` : `<span>${escapeHtml(item.icon ?? "●")}</span>`}
-          </button>
+          </span>
         `).join("")}${overflowCount ? `<span class="tray-more" title="${overflowCount} hidden tray icons">+${overflowCount}</span>` : ""}`;
       }
 
@@ -267,6 +268,7 @@
           </section>
 
           <section class="right">
+            <button class="icon-button tray-flyout" data-shell="trayFlyout" title="Open Windows notification area icons">▴</button>
             <div class="tray">${renderTray(output.systray)}</div>
             <button class="module network" data-shell="wifi" title="Open Wi-Fi networks">
               ${getNetworkIcon(networkInterface)} ${formatNetworkSpeed(tx, rx)}
@@ -314,7 +316,7 @@
 
       bar.addEventListener("click", (event) => {
         const eventTarget = event.target instanceof Element ? event.target : event.target.parentElement;
-        const target = eventTarget?.closest("[data-workspace], [data-action], [data-tray-index], [data-shell]");
+        const target = eventTarget?.closest("[data-workspace], [data-action], [data-shell]");
 
         if (!target) {
           return;
@@ -325,12 +327,6 @@
 
         if (target.dataset.workspace) {
           runGlazeCommand(`focus-workspace ${target.dataset.workspace}`);
-          return;
-        }
-
-        if (target.dataset.trayIndex) {
-          const item = (currentOutput.systray?.items ?? currentOutput.systray?.icons ?? [])[Number(target.dataset.trayIndex)];
-          item?.onLeftClick?.();
           return;
         }
 
