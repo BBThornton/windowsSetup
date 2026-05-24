@@ -30,6 +30,7 @@ Useful options:
 .\install-hyprwin.ps1 -Start
 .\install-hyprwin.ps1 -NoBackup
 .\install-hyprwin.ps1 -NoAutoHotkeyStartup
+.\install-hyprwin.ps1 -NoFontInstall
 .\install-hyprwin.ps1 -CleanZebarBackups
 ```
 
@@ -52,4 +53,6 @@ Requirements:
 - GlazeWM installed.
 - Zebar installed.
 - AutoHotkey v2 installed if you want `alt-drag.ahk`.
-- JetBrainsMono Nerd Font or another Nerd Font installed for the icons.
+- Internet access for the default JetBrainsMono Nerd Font install.
+
+The installer downloads JetBrainsMono Nerd Font from the Nerd Fonts GitHub release URL and installs it for the current Windows user. Use `-NoFontInstall` to skip that step.

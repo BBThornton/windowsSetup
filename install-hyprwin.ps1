@@ -2,6 +2,7 @@
 param(
   [switch]$NoBackup,
   [switch]$NoAutoHotkeyStartup,
+  [switch]$NoFontInstall,
   [switch]$CleanZebarBackups,
   [switch]$Start,
   [switch]$Restart
@@ -17,6 +18,7 @@ $HyprwinRoot = Join-Path $InstallRoot "hyprwin"
 $StartupRoot = [Environment]::GetFolderPath("Startup")
 
 $Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$JetBrainsMonoNerdFontUrl = "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip"
 
 function Remove-ZebarBackups {
   $BackupPattern = Join-Path $ZebarRoot "waybar-mirror.backup-*"
@@ -88,6 +90,43 @@ function Install-Directory {
   Backup-Path -Path $Destination
   Copy-Item -LiteralPath $Source -Destination $Destination -Recurse -Force
   Write-Host "Installed directory: $Destination"
+}
+
+function Install-JetBrainsMonoNerdFont {
+  $FontInstallRoot = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Fonts"
+  $TempRoot = Join-Path ([IO.Path]::GetTempPath()) "hyprwin-fonts-$Timestamp"
+  $ZipPath = Join-Path $TempRoot "JetBrainsMono.zip"
+  $ExtractRoot = Join-Path $TempRoot "JetBrainsMono"
+  $RegistryPath = "HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts"
+
+  New-Item -ItemType Directory -Force -Path $FontInstallRoot, $TempRoot, $ExtractRoot | Out-Null
+  New-Item -Path $RegistryPath -Force | Out-Null
+
+  Write-Host "Downloading JetBrainsMono Nerd Font..."
+  Invoke-WebRequest -Uri $JetBrainsMonoNerdFontUrl -OutFile $ZipPath
+
+  Expand-Archive -LiteralPath $ZipPath -DestinationPath $ExtractRoot -Force
+
+  $FontFiles = Get-ChildItem -LiteralPath $ExtractRoot -Recurse -File |
+    Where-Object { $_.Extension -in @(".ttf", ".otf") -and $_.Name -notmatch "Windows Compatible" }
+
+  if (-not $FontFiles) {
+    throw "Downloaded JetBrainsMono Nerd Font archive did not contain installable font files."
+  }
+
+  foreach ($FontFile in $FontFiles) {
+    $Destination = Join-Path $FontInstallRoot $FontFile.Name
+    Copy-Item -LiteralPath $FontFile.FullName -Destination $Destination -Force
+
+    $FontType = if ($FontFile.Extension -eq ".otf") { "OpenType" } else { "TrueType" }
+    $RegistryName = "JetBrainsMono Nerd Font $($FontFile.BaseName) ($FontType)"
+
+    New-ItemProperty -Path $RegistryPath -Name $RegistryName -Value $Destination -PropertyType String -Force | Out-Null
+  }
+
+  Remove-Item -LiteralPath $TempRoot -Recurse -Force
+  Write-Host "Installed JetBrainsMono Nerd Font for the current user."
+  Write-Host "Restart Zebar and any terminals/apps that need the font."
 }
 
 function Resolve-AutoHotkey {
@@ -182,6 +221,12 @@ $AutoHotkeyShortcut = Join-Path $StartupRoot "hyprwin-alt-drag.lnk"
 
 if ($CleanZebarBackups) {
   Remove-ZebarBackups
+}
+
+if (-not $NoFontInstall) {
+  Install-JetBrainsMonoNerdFont
+} else {
+  Write-Host "Skipped JetBrainsMono Nerd Font install."
 }
 
 Install-File -Source $GlazeConfigSource -Destination $GlazeConfigTarget

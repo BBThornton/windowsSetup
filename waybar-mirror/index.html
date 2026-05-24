@@ -50,10 +50,19 @@
       function formatDataSize(value) {
         const bytes = typeof value === "number" ? value : value?.bytes;
 
-        if (!bytes) return "0B";
-        if (bytes < 1024) return `${bytes.toFixed(0)}B`;
+        if (!bytes || bytes < 1024) return "";
         if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)}K`;
-        return `${(bytes / 1048576).toFixed(1)}M`;
+        return `${(bytes / 1048576).toFixed(bytes >= 104857600 ? 0 : 1)}M`;
+      }
+
+      function formatNetworkSpeed(tx, rx) {
+        const upload = formatDataSize(tx);
+        const download = formatDataSize(rx);
+
+        if (!upload && !download) return "idle";
+        if (!upload) return `↓ ${download}`;
+        if (!download) return `↑ ${upload}`;
+        return `↑ ${upload} ↓ ${download}`;
       }
 
       function formatUsedMemory(memory) {
@@ -149,22 +158,28 @@
         const title = session?.title ?? session?.metadata?.title;
         const label = [artist, title].filter(Boolean).join("  ");
 
+        if (!label) {
+          return "";
+        }
+
         return `
-          <button class="player ${label ? "" : "is-empty"}" data-action="media-play-pause" title="${escapeHtml(label || "Media")}">
+          <button class="player" data-action="media-play-pause" title="${escapeHtml(label)}">
             <span></span>
-            <span>${escapeHtml(label || "No media")}</span>
+            <span>${escapeHtml(label)}</span>
           </button>
         `;
       }
 
       function renderTray(systray) {
         const items = systray?.items ?? systray?.icons ?? [];
+        const visibleItems = items.slice(0, 10);
+        const overflowCount = Math.max(0, items.length - visibleItems.length);
 
-        return items.map((item, index) => `
+        return `${visibleItems.map((item, index) => `
           <button class="tray-button" data-tray-index="${index}" title="${escapeHtml(item.tooltip ?? item.title ?? "")}">
             ${item.iconUrl ? `<img src="${escapeHtml(item.iconUrl)}" alt="" />` : `<span>${escapeHtml(item.icon ?? "●")}</span>`}
           </button>
-        `).join("");
+        `).join("")}${overflowCount ? `<span class="tray-more" title="${overflowCount} hidden tray icons">+${overflowCount}</span>` : ""}`;
       }
 
       function render(output) {
@@ -187,7 +202,6 @@
           <section class="left">
             <span class="cava">▁▂▃▄▅▆▇</span>
             ${renderPlayer(output.media)}
-            <span class="separator blank"></span>
             <div class="window-title" title="${escapeHtml(focusedWindow?.title ?? "")}">
               ${focusedWindow?.title ? `${getWindowIcon(focusedWindow)} ${escapeHtml(focusedWindow.title)}` : ""}
             </div>
@@ -204,19 +218,19 @@
                 <button class="icon-button" data-shell="settings" title="Settings"></button>
               </div>
             </div>
-            <span class="separator"></span>
+            <span class="separator">·</span>
             <div class="drawer notify-drawer">
               <button class="icon-button" data-shell="notifications" title="Notifications"></button>
               <div class="drawer-panel from-left compact-panel">
                 <button class="icon-button" data-shell="update" title="Windows Update">󰁈</button>
               </div>
             </div>
-            <span class="separator"></span>
+            <span class="separator">·</span>
             <div class="workspaces">${renderWorkspaces(glazewm)}</div>
             <span class="clock"> ${escapeHtml(output.date?.formatted ?? "--:--:--")}</span>
-            <span class="separator"></span>
+            <span class="separator">·</span>
             <span class="module weather ${weatherTemp == null ? "muted" : ""}">${weatherLabel}</span>
-            <span class="separator"></span>
+            <span class="separator">·</span>
             <button class="icon-button" title="Idle inhibitor placeholder"></button>
             <button class="hint" data-shell="hint" title="Keybind hints">󰺁 HINT!</button>
           </section>
@@ -224,9 +238,9 @@
           <section class="right">
             <div class="tray">${renderTray(output.systray)}</div>
             <span class="module network" title="${escapeHtml(networkInterface?.name ?? "Network")}">
-              ${getNetworkIcon(networkInterface)}  ${formatDataSize(tx)}  ${formatDataSize(rx)}
+              ${getNetworkIcon(networkInterface)} ${formatNetworkSpeed(tx, rx)}
             </span>
-            <span class="separator"></span>
+            <span class="separator">·</span>
             <div class="drawer mobo-drawer">
               <span class="module temperature ${(output.cpu?.usage ?? 0) > 90 ? "critical" : ""}">󰈸</span>
               <div class="drawer-panel from-right">
@@ -250,9 +264,9 @@
                 </button>
               </div>
             </div>
-            <span class="separator"></span>
+            <span class="separator">·</span>
             <button class="icon-button nightlight" data-shell="nightlight" title="Night light">󰖔</button>
-            <span class="separator"></span>
+            <span class="separator">·</span>
             <div class="drawer status-drawer">
               <button class="icon-button power" data-shell="power" title="Power dialog">⏻</button>
               <div class="drawer-panel from-right">

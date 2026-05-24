@@ -24,6 +24,8 @@ The installer backs up existing targets, then copies:
 - `waybar-mirror\` to `%USERPROFILE%\.glzr\zebar\waybar-mirror\`
 - `alt-drag.ahk` to `%USERPROFILE%\.glzr\hyprwin\alt-drag.ahk`
 
+It also installs JetBrainsMono Nerd Font for the current Windows user unless `-NoFontInstall` is passed.
+
 ## After Install
 
 Open Zebar from the tray and enable:
@@ -39,6 +41,6 @@ Enable `Run on startup` for that widget if you want Zebar to restore it automati
 - GlazeWM
 - Zebar v3
 - AutoHotkey v2 for `alt-drag.ahk`
-- A Nerd Font, preferably JetBrainsMono Nerd Font
+- Internet access for the default JetBrainsMono Nerd Font install
 
 See `INSTALL-HYPRWIN.md` for installer options.
