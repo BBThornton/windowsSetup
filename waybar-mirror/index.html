@@ -7,11 +7,81 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main id="bar" class="bar"></main>
+    <main id="bar" class="bar">
+      <section class="left">
+        <span class="cava">▁▂▃▄▅▆▇</span>
+        <button id="player" class="player is-hidden" data-action="media-play-pause" title="Media">
+          <span></span>
+          <span id="player-text"></span>
+        </button>
+        <div id="window-title" class="window-title"></div>
+      </section>
+
+      <section class="center">
+        <div class="drawer app-drawer">
+          <button class="icon-button" data-shell="launcher" title="Launcher"></button>
+          <div class="drawer-panel from-left">
+            <button class="icon-button" data-shell="theme" title="Theme">󰔎</button>
+            <button class="icon-button" data-shell="files" title="File Explorer"></button>
+            <button class="icon-button" data-shell="terminal" title="Terminal"></button>
+            <button class="icon-button" data-shell="browser" title="Browser"></button>
+            <button class="icon-button" data-shell="settings" title="Settings"></button>
+          </div>
+        </div>
+        <span class="separator">·</span>
+        <div class="drawer notify-drawer">
+          <button class="icon-button" data-shell="notifications" title="Notifications"></button>
+          <div class="drawer-panel from-left compact-panel">
+            <button class="icon-button" data-shell="update" title="Windows Update">󰁈</button>
+          </div>
+        </div>
+        <span class="separator">·</span>
+        <div id="workspaces" class="workspaces"></div>
+        <span id="clock" class="clock"> --:--:--</span>
+        <span class="separator">·</span>
+        <span id="weather" class="module weather muted">󰖐</span>
+        <span class="separator">·</span>
+        <span class="icon-button" title="Idle inhibitor placeholder"></span>
+      </section>
+
+      <section class="right">
+        <button class="icon-button tray-flyout" data-shell="trayFlyout" title="Open Windows notification area icons">▴</button>
+        <div id="tray" class="tray"></div>
+        <button id="network" class="module network" data-shell="wifi" title="Open Wi-Fi networks">󰌙 idle</button>
+        <span class="separator">·</span>
+        <div class="drawer mobo-drawer">
+          <button id="temperature" class="module temperature" data-shell="taskManager" title="Open Task Manager">󰈸</button>
+          <div class="drawer-panel from-right">
+            <button id="cpu" class="module cpu" data-shell="taskManager" title="Open Task Manager">0% 󰍛</button>
+            <span class="module power-profile"></span>
+            <span id="memory" class="module memory">0.0G 󰾆</span>
+            <span id="disk" class="module disk is-hidden"></span>
+            <span id="battery" class="module battery is-hidden"></span>
+          </div>
+        </div>
+        <span class="separator">|</span>
+        <div class="drawer audio-drawer">
+          <button id="audio" class="module audio" data-action="audio-toggle" title="Mute/unmute audio">󰖁</button>
+          <div class="drawer-panel from-right compact-panel">
+            <button id="mic" class="module mic" data-shell="audioSettings" title="Open sound settings"> 0%</button>
+          </div>
+        </div>
+        <span class="separator">·</span>
+        <button class="icon-button nightlight" data-shell="nightlight" title="Night light">󰖔</button>
+        <span class="separator">·</span>
+        <div class="drawer status-drawer">
+          <button class="icon-button lock" data-shell="lock" title="Lock workstation">󰌾</button>
+          <div class="drawer-panel from-right">
+            <span id="keyboard" class="module keyboard">󰪛 </span>
+          </div>
+        </div>
+      </section>
+    </main>
 
     <script type="module">
       import * as zebar from "https://esm.sh/zebar?bundle";
 
+      const bar = document.getElementById("bar");
       const providers = zebar.createProviderGroup({
         glazewm: { type: "glazewm" },
         date: { type: "date", formatting: "HH:mm:ss" },
@@ -27,15 +97,29 @@
         systray: { type: "systray" }
       });
 
-      const bar = document.getElementById("bar");
+      const elements = {
+        audio: document.getElementById("audio"),
+        battery: document.getElementById("battery"),
+        clock: document.getElementById("clock"),
+        cpu: document.getElementById("cpu"),
+        disk: document.getElementById("disk"),
+        keyboard: document.getElementById("keyboard"),
+        memory: document.getElementById("memory"),
+        mic: document.getElementById("mic"),
+        network: document.getElementById("network"),
+        player: document.getElementById("player"),
+        playerText: document.getElementById("player-text"),
+        temperature: document.getElementById("temperature"),
+        tray: document.getElementById("tray"),
+        weather: document.getElementById("weather"),
+        windowTitle: document.getElementById("window-title"),
+        workspaces: document.getElementById("workspaces")
+      };
 
-      function escapeHtml(value) {
-        return String(value ?? "")
-          .replaceAll("&", "&amp;")
-          .replaceAll("<", "&lt;")
-          .replaceAll(">", "&gt;")
-          .replaceAll('"', "&quot;");
-      }
+      let currentOutput = providers.outputMap;
+      let previousPlaybackVolume = 40;
+      let previousWorkspaceSignature = "";
+      let previousTraySignature = "";
 
       function spawnShell(program, args = "") {
         if (!zebar.shellSpawn) {
@@ -45,10 +129,7 @@
 
         try {
           const result = zebar.shellSpawn(program, args);
-
-          if (result?.catch) {
-            result.catch(() => zebar.shellSpawn({ program, args }));
-          }
+          result?.catch?.(() => zebar.shellSpawn({ program, args }));
         } catch (error) {
           zebar.shellSpawn({ program, args });
         }
@@ -72,19 +153,32 @@
           lock: ["rundll32.exe", "user32.dll,LockWorkStation"]
         };
         const [program, args] = actions[actionName] ?? [];
-
-        if (program) {
-          spawnShell(program, args);
-        }
+        if (program) spawnShell(program, args);
       }
 
       function runGlazeCommand(command) {
-        providers.outputMap.glazewm?.runCommand?.(command);
+        currentOutput.glazewm?.runCommand?.(command);
+      }
+
+      function setText(element, value) {
+        const text = String(value ?? "");
+        if (element.textContent !== text) element.textContent = text;
+      }
+
+      function setHidden(element, isHidden) {
+        element.classList.toggle("is-hidden", isHidden);
+      }
+
+      function setClassFlag(element, className, enabled) {
+        element.classList.toggle(className, Boolean(enabled));
       }
 
       function formatDataSize(value) {
-        const bytes = typeof value === "number" ? value : value?.bytes;
+        if (typeof value === "object" && value?.iecValue != null && value?.iecUnit) {
+          return `${value.iecValue.toFixed(value.iecValue >= 100 ? 0 : 1)}${value.iecUnit}`;
+        }
 
+        const bytes = typeof value === "number" ? value : value?.bytes;
         if (!bytes || bytes < 1024) return "";
         if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)}K`;
         return `${(bytes / 1048576).toFixed(bytes >= 104857600 ? 0 : 1)}M`;
@@ -93,7 +187,6 @@
       function formatNetworkSpeed(tx, rx) {
         const upload = formatDataSize(tx);
         const download = formatDataSize(rx);
-
         if (!upload && !download) return "idle";
         if (!upload) return `↓ ${download}`;
         if (!download) return `↑ ${upload}`;
@@ -120,6 +213,14 @@
         if (networkInterface.type === "wifi") return "󰤨";
         if (networkInterface.type === "ethernet") return "󰌘";
         return "󰈁";
+      }
+
+      function getDeviceVolume(device) {
+        return device?.volume ?? device?.volumePercent ?? 0;
+      }
+
+      function getDeviceId(device) {
+        return device?.deviceId ?? device?.id;
       }
 
       function getVolumeIcon(device) {
@@ -155,8 +256,18 @@
           [/youtube/i, ""],
           [/github/i, ""]
         ];
-
         return rules.find(([pattern]) => pattern.test(source))?.[1] ?? "";
+      }
+
+      function getWeatherIcon(weather) {
+        const status = String(weather?.status ?? weather?.current?.condition ?? weather?.current?.weatherDescription ?? "").toLowerCase();
+        if (/clear|sun/.test(status)) return "";
+        if (/rain|drizzle|shower/.test(status)) return "";
+        if (/snow|sleet|ice/.test(status)) return "";
+        if (/storm|thunder/.test(status)) return "";
+        if (/fog|mist|haze/.test(status)) return "󰖑";
+        if (/cloud|overcast/.test(status)) return "";
+        return "󰖐";
       }
 
       function getWorkspaces(glazewm) {
@@ -167,175 +278,202 @@
         return workspace?.children ?? workspace?.windows ?? workspace?.containers ?? [];
       }
 
-      function renderWorkspaces(glazewm) {
-        return getWorkspaces(glazewm).map((workspace) => {
+      function update(output) {
+        currentOutput = output;
+
+        updateWindow(output.glazewm);
+        updatePlayer(output.media);
+        updateWorkspaces(output.glazewm);
+        updateClock(output.date);
+        updateWeather(output.weather);
+        updateTray(output.systray);
+        updateNetwork(output.network);
+        updateMobo(output);
+        updateAudio(output.audio);
+        updateKeyboard(output.keyboard);
+      }
+
+      function updateWindow(glazewm) {
+        const focusedWindow = glazewm?.focusedWindow ?? glazewm?.focusedContainer;
+        const label = focusedWindow?.title ? `${getWindowIcon(focusedWindow)} ${focusedWindow.title}` : "";
+        setText(elements.windowTitle, label);
+        elements.windowTitle.title = focusedWindow?.title ?? "";
+      }
+
+      function updatePlayer(media) {
+        const session = media?.currentSession ?? media?.sessions?.[0];
+        const label = [session?.artist ?? session?.metadata?.artist, session?.title ?? session?.metadata?.title].filter(Boolean).join("  ");
+        setHidden(elements.player, !label);
+        if (label) {
+          setText(elements.playerText, label);
+          elements.player.title = label;
+        }
+      }
+
+      function updateWorkspaces(glazewm) {
+        const workspaces = getWorkspaces(glazewm);
+        const signature = JSON.stringify(workspaces.map((workspace) => ({
+          name: workspace.name,
+          displayName: workspace.displayName,
+          focused: workspace.hasFocus || workspace.isFocused || glazewm?.displayedWorkspace?.name === workspace.name,
+          displayed: workspace.isDisplayed || glazewm?.displayedWorkspace?.name === workspace.name,
+          windows: getWorkspaceWindows(workspace).slice(0, 4).map(getWindowIcon)
+        })));
+
+        if (signature === previousWorkspaceSignature) return;
+        previousWorkspaceSignature = signature;
+        elements.workspaces.replaceChildren(...workspaces.map((workspace) => {
+          const button = document.createElement("button");
           const windows = getWorkspaceWindows(workspace);
           const isFocused = workspace.hasFocus || workspace.isFocused || glazewm?.displayedWorkspace?.name === workspace.name;
           const isDisplayed = workspace.isDisplayed || glazewm?.displayedWorkspace?.name === workspace.name;
-          const windowIcons = windows.slice(0, 4).map((windowLike) => `<span>${getWindowIcon(windowLike)}</span>`).join("");
 
-          return `
-            <button
-              class="workspace ${isFocused ? "active" : ""} ${isDisplayed ? "displayed" : ""}"
-              data-workspace="${escapeHtml(workspace.name)}"
-              title="Workspace ${escapeHtml(workspace.name)}"
-            >
-              <span>${escapeHtml(workspace.displayName ?? workspace.name)}</span>
-              ${windowIcons ? `<span class="workspace-windows">${windowIcons}</span>` : ""}
-            </button>
-          `;
-        }).join("");
+          button.className = `workspace ${isFocused ? "active" : ""} ${isDisplayed ? "displayed" : ""}`;
+          button.dataset.workspace = workspace.name;
+          button.title = `Workspace ${workspace.name}`;
+          button.textContent = workspace.displayName ?? workspace.name;
+
+          if (windows.length > 0) {
+            const icons = document.createElement("span");
+            icons.className = "workspace-windows";
+            icons.textContent = windows.slice(0, 4).map(getWindowIcon).join("");
+            button.append(" ", icons);
+          }
+
+          return button;
+        }));
       }
 
-      function renderPlayer(media) {
-        const session = media?.currentSession ?? media?.sessions?.[0];
-        const artist = session?.artist ?? session?.metadata?.artist;
-        const title = session?.title ?? session?.metadata?.title;
-        const label = [artist, title].filter(Boolean).join("  ");
-
-        if (!label) {
-          return "";
-        }
-
-        return `
-          <button class="player" data-action="media-play-pause" title="${escapeHtml(label)}">
-            <span></span>
-            <span>${escapeHtml(label)}</span>
-          </button>
-        `;
+      function updateClock(date) {
+        setText(elements.clock, ` ${date?.formatted ?? "--:--:--"}`);
       }
 
-      function renderTray(systray) {
+      function updateWeather(weather) {
+        const current = weather?.current;
+        const temperature = weather?.celsiusTemp ?? current?.temperatureCelsius ?? current?.temperature?.celsius ?? current?.tempC;
+        const icon = getWeatherIcon(weather);
+        setClassFlag(elements.weather, "muted", temperature == null);
+        setText(elements.weather, temperature == null ? icon : `${icon} ${Math.round(temperature)}C`);
+      }
+
+      function updateTray(systray) {
         const items = systray?.items ?? systray?.icons ?? [];
         const visibleItems = items.slice(0, 10);
-        const overflowCount = Math.max(0, items.length - visibleItems.length);
+        const signature = JSON.stringify(visibleItems.map((item) => [item.id, item.iconHash, item.iconUrl, item.tooltip ?? item.title]));
 
-        return `${visibleItems.map((item) => `
-          <button class="tray-icon" type="button" data-tray-icon="${escapeHtml(item.id ?? "")}" title="${escapeHtml(item.tooltip ?? item.title ?? "")}">
-            ${item.iconUrl ? `<img src="${escapeHtml(item.iconUrl)}" alt="" />` : `<span>${escapeHtml(item.icon ?? "●")}</span>`}
-          </button>
-        `).join("")}${overflowCount ? `<span class="tray-more" title="${overflowCount} hidden tray icons">+${overflowCount}</span>` : ""}`;
+        if (signature === previousTraySignature) return;
+        previousTraySignature = signature;
+        elements.tray.replaceChildren(...visibleItems.map((item) => {
+          const icon = document.createElement("span");
+          icon.className = "tray-icon";
+          icon.dataset.trayIcon = item.id;
+          icon.title = item.tooltip ?? item.title ?? "";
+
+          if (item.iconUrl) {
+            const image = document.createElement("img");
+            image.src = item.iconUrl;
+            image.alt = "";
+            icon.append(image);
+          } else {
+            icon.textContent = item.icon ?? "●";
+          }
+
+          icon.addEventListener("click", () => systray?.onLeftClick?.(item.id));
+          icon.addEventListener("dblclick", () => systray?.onLeftDoubleClick?.(item.id));
+          icon.addEventListener("contextmenu", (event) => {
+            event.preventDefault();
+            systray?.onRightClick?.(item.id);
+          });
+          icon.addEventListener("auxclick", (event) => {
+            if (event.button === 1) {
+              event.preventDefault();
+              systray?.onMiddleClick?.(item.id);
+            }
+          });
+          icon.addEventListener("mouseenter", () => systray?.onHoverEnter?.(item.id));
+          icon.addEventListener("mouseleave", () => systray?.onHoverLeave?.(item.id));
+
+          let pendingHoverMove = false;
+          icon.addEventListener("mousemove", () => {
+            if (pendingHoverMove) return;
+            pendingHoverMove = true;
+            requestAnimationFrame(() => {
+              pendingHoverMove = false;
+              systray?.onHoverMove?.(item.id);
+            });
+          });
+
+          return icon;
+        }));
+
+        if (items.length > visibleItems.length) {
+          const more = document.createElement("span");
+          more.className = "tray-more";
+          more.title = `${items.length - visibleItems.length} hidden tray icons`;
+          more.textContent = `+${items.length - visibleItems.length}`;
+          elements.tray.append(more);
+        }
       }
 
-      function render(output) {
-        const glazewm = output.glazewm;
-        const focusedWindow = glazewm?.focusedWindow ?? glazewm?.focusedContainer;
-        const networkInterface = getNetworkInterface(output.network);
-        const tx = networkInterface?.transmitSpeed ?? networkInterface?.txBytesPerSec ?? networkInterface?.bandwidthUpBytes;
-        const rx = networkInterface?.receiveSpeed ?? networkInterface?.rxBytesPerSec ?? networkInterface?.bandwidthDownBytes;
-        const playback = output.audio?.defaultPlaybackDevice;
-        const recording = output.audio?.defaultRecordingDevice;
+      function updateNetwork(network) {
+        const networkInterface = getNetworkInterface(network);
+        const tx = network?.traffic?.transmitted ?? networkInterface?.transmitSpeed ?? networkInterface?.txBytesPerSec ?? networkInterface?.bandwidthUpBytes;
+        const rx = network?.traffic?.received ?? networkInterface?.receiveSpeed ?? networkInterface?.rxBytesPerSec ?? networkInterface?.bandwidthDownBytes;
+        setText(elements.network, `${getNetworkIcon(networkInterface)} ${formatNetworkSpeed(tx, rx)}`);
+        elements.network.title = networkInterface?.name ? `Open Wi-Fi networks (${networkInterface.name})` : "Open Wi-Fi networks";
+      }
+
+      function updateMobo(output) {
+        const cpuUsage = output.cpu?.usage ?? 0;
         const mainDisk = output.disk?.disks?.find((item) => !item.isRemovable) ?? output.disk?.disks?.[0];
         const diskUsage = getDiskUsage(mainDisk);
         const chargePercent = output.battery?.chargePercent ?? output.battery?.percentage ?? output.battery?.capacity;
-        const currentWeather = output.weather?.current;
-        const weatherTemp = currentWeather?.temperatureCelsius ?? currentWeather?.temperature?.celsius ?? currentWeather?.tempC;
-        const weatherLabel = weatherTemp == null ? "󰖐" : `󰖐 ${Math.round(weatherTemp)}C`;
-        const capsActive = output.keyboard?.capsLock || output.keyboard?.capslock;
-        const playbackVolume = getDeviceVolume(playback);
-        const recordingVolume = getDeviceVolume(recording);
 
-        bar.innerHTML = `
-          <section class="left">
-            <span class="cava">▁▂▃▄▅▆▇</span>
-            ${renderPlayer(output.media)}
-            <div class="window-title" title="${escapeHtml(focusedWindow?.title ?? "")}">
-              ${focusedWindow?.title ? `${getWindowIcon(focusedWindow)} ${escapeHtml(focusedWindow.title)}` : ""}
-            </div>
-          </section>
+        setText(elements.cpu, `${Math.round(cpuUsage)}% 󰍛`);
+        setClassFlag(elements.cpu, "warning", cpuUsage > 70 && cpuUsage <= 90);
+        setClassFlag(elements.cpu, "critical", cpuUsage > 90);
+        setClassFlag(elements.temperature, "critical", cpuUsage > 90);
+        setText(elements.memory, `${formatUsedMemory(output.memory)} 󰾆`);
 
-          <section class="center">
-            <div class="drawer app-drawer">
-              <button class="icon-button" data-shell="launcher" title="Launcher"></button>
-              <div class="drawer-panel from-left">
-                <button class="icon-button" data-shell="theme" title="Theme">󰔎</button>
-                <button class="icon-button" data-shell="files" title="File Explorer"></button>
-                <button class="icon-button" data-shell="terminal" title="Terminal"></button>
-                <button class="icon-button" data-shell="browser" title="Browser"></button>
-                <button class="icon-button" data-shell="settings" title="Settings"></button>
-              </div>
-            </div>
-            <span class="separator">·</span>
-            <div class="drawer notify-drawer">
-              <button class="icon-button" data-shell="notifications" title="Notifications"></button>
-              <div class="drawer-panel from-left compact-panel">
-                <button class="icon-button" data-shell="update" title="Windows Update">󰁈</button>
-              </div>
-            </div>
-            <span class="separator">·</span>
-            <div class="workspaces">${renderWorkspaces(glazewm)}</div>
-            <span class="clock"> ${escapeHtml(output.date?.formatted ?? "--:--:--")}</span>
-            <span class="separator">·</span>
-            <span class="module weather ${weatherTemp == null ? "muted" : ""}">${weatherLabel}</span>
-            <span class="separator">·</span>
-            <span class="icon-button" title="Idle inhibitor placeholder"></span>
-          </section>
+        setHidden(elements.disk, diskUsage == null);
+        if (diskUsage != null) setText(elements.disk, `${diskUsage}% 󰋊`);
 
-          <section class="right">
-            <button class="icon-button tray-flyout" data-shell="trayFlyout" title="Open Windows notification area icons">▴</button>
-            <div class="tray">${renderTray(output.systray)}</div>
-            <button class="module network" data-shell="wifi" title="Open Wi-Fi networks">
-              ${getNetworkIcon(networkInterface)} ${formatNetworkSpeed(tx, rx)}
-            </button>
-            <span class="separator">·</span>
-            <div class="drawer mobo-drawer">
-              <button class="module temperature ${(output.cpu?.usage ?? 0) > 90 ? "critical" : ""}" data-shell="taskManager" title="Open Task Manager">󰈸</button>
-              <div class="drawer-panel from-right">
-                <button class="module cpu ${(output.cpu?.usage ?? 0) > 90 ? "critical" : (output.cpu?.usage ?? 0) > 70 ? "warning" : ""}" data-shell="taskManager" title="Open Task Manager">
-                  ${Math.round(output.cpu?.usage ?? 0)}% 󰍛
-                </button>
-                <span class="module power-profile"></span>
-                <span class="module memory">${formatUsedMemory(output.memory)} 󰾆</span>
-                ${diskUsage == null ? "" : `<span class="module disk">${diskUsage}% 󰋊</span>`}
-                ${chargePercent == null ? "" : `<span class="module battery ${chargePercent <= 15 ? "critical" : ""}">${getBatteryIcon(output.battery)} ${Math.round(chargePercent)}%</span>`}
-              </div>
-            </div>
-            <span class="separator">|</span>
-            <div class="drawer audio-drawer">
-              <button class="module audio ${playbackVolume === 0 ? "muted" : ""}" data-action="audio-toggle" title="Mute/unmute audio">
-                ${getVolumeIcon(playback)} ${playbackVolume === 0 ? "" : `${Math.round(playbackVolume)}%`}
-              </button>
-              <div class="drawer-panel from-right compact-panel">
-                <button class="module mic ${recordingVolume === 0 ? "muted" : ""}" data-shell="audioSettings" title="Open sound settings">
-                  ${recordingVolume === 0 ? "" : ""} ${Math.round(recordingVolume)}%
-                </button>
-              </div>
-            </div>
-            <span class="separator">·</span>
-            <button class="icon-button nightlight" data-shell="nightlight" title="Night light">󰖔</button>
-            <span class="separator">·</span>
-            <div class="drawer status-drawer">
-              <button class="icon-button lock" data-shell="lock" title="Lock workstation">󰌾</button>
-              <div class="drawer-panel from-right">
-                <span class="module keyboard ${capsActive ? "active" : ""}">󰪛 ${capsActive ? "" : ""}</span>
-              </div>
-            </div>
-          </section>
-        `;
-
-        currentOutput = output;
+        setHidden(elements.battery, chargePercent == null);
+        if (chargePercent != null) {
+          setText(elements.battery, `${getBatteryIcon(output.battery)} ${Math.round(chargePercent)}%`);
+          setClassFlag(elements.battery, "critical", chargePercent <= 15);
+        }
       }
 
-      let currentOutput = providers.outputMap;
+      function updateAudio(audio) {
+        const playback = audio?.defaultPlaybackDevice;
+        const recording = audio?.defaultRecordingDevice;
+        const playbackVolume = getDeviceVolume(playback);
+        const recordingVolume = getDeviceVolume(recording);
+        const isMuted = playback?.isMuted || playbackVolume === 0;
+
+        setText(elements.audio, `${getVolumeIcon(playback)} ${isMuted ? "" : `${Math.round(playbackVolume)}%`}`);
+        setClassFlag(elements.audio, "muted", isMuted);
+        setText(elements.mic, `${recording?.isMuted || recordingVolume === 0 ? "" : ""} ${Math.round(recordingVolume)}%`);
+        setClassFlag(elements.mic, "muted", recording?.isMuted || recordingVolume === 0);
+      }
+
+      function updateKeyboard(keyboard) {
+        const capsActive = keyboard?.capsLock || keyboard?.capslock;
+        setText(elements.keyboard, `󰪛 ${capsActive ? "" : ""}`);
+        setClassFlag(elements.keyboard, "active", capsActive);
+      }
 
       bar.addEventListener("click", (event) => {
         const eventTarget = event.target instanceof Element ? event.target : event.target.parentElement;
-        const target = eventTarget?.closest("[data-workspace], [data-action], [data-shell], [data-tray-icon]");
-
-        if (!target) {
-          return;
-        }
+        const target = eventTarget?.closest("[data-workspace], [data-action], [data-shell]");
+        if (!target) return;
 
         event.preventDefault();
         event.stopPropagation();
 
         if (target.dataset.workspace) {
-          runGlazeCommand(`focus-workspace ${target.dataset.workspace}`);
-          return;
-        }
-
-        if (target.dataset.trayIcon) {
-          currentOutput.systray?.onLeftClick?.(target.dataset.trayIcon);
+          runGlazeCommand(`focus --workspace ${target.dataset.workspace}`);
           return;
         }
 
@@ -349,102 +487,46 @@
           return;
         }
 
-        if (target.dataset.shell) {
-          runShellAction(target.dataset.shell);
-        }
-      });
-
-      bar.addEventListener("dblclick", (event) => {
-        const eventTarget = event.target instanceof Element ? event.target : event.target.parentElement;
-        const target = eventTarget?.closest("[data-tray-icon]");
-
-        if (!target?.dataset.trayIcon) {
-          return;
-        }
-
-        event.preventDefault();
-        event.stopPropagation();
-        currentOutput.systray?.onLeftDoubleClick?.(target.dataset.trayIcon);
-      });
-
-      bar.addEventListener("contextmenu", (event) => {
-        const eventTarget = event.target instanceof Element ? event.target : event.target.parentElement;
-        const target = eventTarget?.closest("[data-tray-icon]");
-
-        if (!target?.dataset.trayIcon) {
-          return;
-        }
-
-        event.preventDefault();
-        event.stopPropagation();
-        currentOutput.systray?.onRightClick?.(target.dataset.trayIcon);
+        if (target.dataset.shell) runShellAction(target.dataset.shell);
       });
 
       bar.addEventListener("auxclick", (event) => {
         const eventTarget = event.target instanceof Element ? event.target : event.target.parentElement;
-        const target = eventTarget?.closest("[data-tray-icon]");
-
-        if (!target?.dataset.trayIcon || event.button !== 1) {
-          return;
-        }
+        const target = eventTarget?.closest("[data-workspace]");
+        if (!target?.dataset.workspace || event.button !== 1) return;
 
         event.preventDefault();
         event.stopPropagation();
-        currentOutput.systray?.onMiddleClick?.(target.dataset.trayIcon);
-      });
-
-      bar.addEventListener("mouseover", (event) => {
-        const eventTarget = event.target instanceof Element ? event.target : event.target.parentElement;
-        const target = eventTarget?.closest("[data-tray-icon]");
-
-        if (!target?.dataset.trayIcon || (event.relatedTarget instanceof Node && target.contains(event.relatedTarget))) {
-          return;
-        }
-
-        currentOutput.systray?.onHoverEnter?.(target.dataset.trayIcon);
-      });
-
-      bar.addEventListener("mouseout", (event) => {
-        const eventTarget = event.target instanceof Element ? event.target : event.target.parentElement;
-        const target = eventTarget?.closest("[data-tray-icon]");
-
-        if (!target?.dataset.trayIcon || (event.relatedTarget instanceof Node && target.contains(event.relatedTarget))) {
-          return;
-        }
-
-        currentOutput.systray?.onHoverLeave?.(target.dataset.trayIcon);
-      });
-
-      bar.addEventListener("mousemove", (event) => {
-        const eventTarget = event.target instanceof Element ? event.target : event.target.parentElement;
-        const target = eventTarget?.closest("[data-tray-icon]");
-
-        if (!target?.dataset.trayIcon) {
-          return;
-        }
-
-        currentOutput.systray?.onHoverMove?.(target.dataset.trayIcon);
+        runGlazeCommand(`move --workspace ${target.dataset.workspace}`);
       });
 
       bar.addEventListener("wheel", (event) => {
         const eventTarget = event.target instanceof Element ? event.target : event.target.parentElement;
+        if (!eventTarget?.closest(".workspaces")) return;
 
-        if (eventTarget?.closest(".workspaces")) {
-          event.preventDefault();
-          runGlazeCommand(event.deltaY > 0 ? "focus-next-workspace" : "focus-prev-workspace");
-        }
+        event.preventDefault();
+        runGlazeCommand(event.deltaY > 0 ? "focus --next-active-workspace" : "focus --prev-active-workspace");
       });
-
-      let previousPlaybackVolume = 40;
-
-      function getDeviceVolume(device) {
-        return device?.volume ?? device?.volumePercent ?? 0;
-      }
 
       function togglePlaybackVolume() {
         const audio = currentOutput.audio;
         const playback = audio?.defaultPlaybackDevice;
         const currentVolume = getDeviceVolume(playback);
+
+        if (!playback) {
+          runShellAction("audioSettings");
+          return;
+        }
+
+        if (audio?.setMute) {
+          audio.setMute(!playback.isMuted, { deviceId: getDeviceId(playback) });
+          return;
+        }
+
+        if (audio?.setMuted) {
+          audio.setMuted(getDeviceId(playback), !playback.isMuted);
+          return;
+        }
 
         if (!audio?.setVolume) {
           runShellAction("audioSettings");
@@ -460,8 +542,8 @@
         audio.setVolume(Math.max(previousPlaybackVolume, 20));
       }
 
-      providers.onOutput(() => render({ ...providers.outputMap }));
-      render(providers.outputMap);
+      providers.onOutput(() => update({ ...providers.outputMap }));
+      update(providers.outputMap);
     </script>
   </body>
 </html>
