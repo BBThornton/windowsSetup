@@ -64,7 +64,7 @@
         </div>
         <span class="separator">|</span>
         <div class="drawer audio-drawer">
-          <button id="audio" class="module audio" data-action="audio-toggle" title="Mute/unmute audio">󰖁</button>
+          <button id="audio" class="module audio" data-action="audio-toggle" title="Mute/unmute audio; right-click for sound settings">󰖁</button>
           <div class="drawer-panel from-right compact-panel">
             <button id="mic" class="module mic" data-shell="audioSettings" title="Open sound settings"> 0%</button>
           </div>
@@ -300,6 +300,30 @@
         return "󰖐";
       }
 
+      function getTraySearchText(item) {
+        return [
+          item?.tooltip,
+          item?.title,
+          item?.id
+        ].filter(Boolean).join(" ").toLowerCase();
+      }
+
+      function isHiddenTrayIcon(item) {
+        const text = getTraySearchText(item);
+        return [
+          /meet now/,
+          /safely remove hardware/,
+          /eject media/,
+          /eject .*media/,
+          /remove hardware/,
+          /\bvolume\b/,
+          /\bspeaker\b/,
+          /\bspeakers\b/,
+          /realtek.*audio/,
+          /sound.*output/
+        ].some((pattern) => pattern.test(text));
+      }
+
       function getWorkspaces(glazewm) {
         return glazewm?.currentWorkspaces ?? glazewm?.allWorkspaces ?? glazewm?.workspaces ?? [];
       }
@@ -392,7 +416,7 @@
       }
 
       function updateTray(systray) {
-        const items = systray?.items ?? systray?.icons ?? [];
+        const items = (systray?.items ?? systray?.icons ?? []).filter((item) => !isHiddenTrayIcon(item));
         const compactItems = items.slice(0, visibleTrayIconCount);
         const signature = JSON.stringify({
           expanded: isTrayExpanded,
@@ -548,6 +572,12 @@
         isTrayExpanded = false;
         previousTraySignature = "";
         updateTray(currentOutput.systray);
+      });
+
+      elements.audio.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        runShellAction("audioSettings");
       });
 
       bar.addEventListener("auxclick", (event) => {
