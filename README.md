@@ -7,6 +7,7 @@ Windows GlazeWM + Zebar setup that mirrors this machine's Hyprland/Waybar workfl
 - `glazewm.yaml` - GlazeWM config with Hyprland-like gaps, workspaces, focus behavior, borders, and keybindings.
 - `waybar-mirror/` - Zebar v3 widget pack modeled after the local Waybar `TOP-Default` layout.
 - `alt-drag.ahk` - AutoHotkey v2 helper for Alt + mouse move/resize.
+- `start-alt-drag.ps1` - Direct launcher for testing the AutoHotkey helper.
 - `install-hyprwin.ps1` - Full installer for all of the above.
 
 ## Install

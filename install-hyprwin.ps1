@@ -75,6 +75,27 @@ function Install-Directory {
   Write-Host "Installed directory: $Destination"
 }
 
+function Set-ZebarWidgetHtmlPath {
+  param([Parameter(Mandatory)] [string]$PackPath)
+
+  $ZpackPath = Join-Path $PackPath "zpack.json"
+  $IndexPath = Join-Path $PackPath "index.html"
+
+  Assert-SourceFile -Path $ZpackPath
+  Assert-SourceFile -Path $IndexPath
+
+  $Zpack = Get-Content -LiteralPath $ZpackPath -Raw | ConvertFrom-Json
+
+  foreach ($Widget in $Zpack.widgets) {
+    if ($Widget.htmlPath -eq "index.html" -or $Widget.htmlPath -eq ".\index.html" -or $Widget.htmlPath -eq "./index.html") {
+      $Widget.htmlPath = $IndexPath
+    }
+  }
+
+  $Zpack | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $ZpackPath -Encoding UTF8
+  Write-Host "Set Zebar htmlPath: $IndexPath"
+}
+
 function Resolve-AutoHotkey {
   $Candidates = @(
     (Get-Command "AutoHotkey64.exe" -ErrorAction SilentlyContinue).Source,
@@ -161,11 +182,15 @@ $ZebarPackSource = Join-Path $RepoRoot "waybar-mirror"
 $ZebarPackTarget = Join-Path $ZebarRoot "waybar-mirror"
 $AutoHotkeySource = Join-Path $RepoRoot "alt-drag.ahk"
 $AutoHotkeyTarget = Join-Path $HyprwinRoot "alt-drag.ahk"
+$AutoHotkeyStartSource = Join-Path $RepoRoot "start-alt-drag.ps1"
+$AutoHotkeyStartTarget = Join-Path $HyprwinRoot "start-alt-drag.ps1"
 $AutoHotkeyShortcut = Join-Path $StartupRoot "hyprwin-alt-drag.lnk"
 
 Install-File -Source $GlazeConfigSource -Destination $GlazeConfigTarget
 Install-Directory -Source $ZebarPackSource -Destination $ZebarPackTarget
+Set-ZebarWidgetHtmlPath -PackPath $ZebarPackTarget
 Install-File -Source $AutoHotkeySource -Destination $AutoHotkeyTarget
+Install-File -Source $AutoHotkeyStartSource -Destination $AutoHotkeyStartTarget
 
 if (-not $NoAutoHotkeyStartup) {
   New-StartupShortcut -ShortcutPath $AutoHotkeyShortcut -TargetPath $AutoHotkeyTarget

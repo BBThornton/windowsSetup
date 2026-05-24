@@ -1,52 +1,80 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
+#Warn
 
-; ─────────────────────────────────────────────────────────────────────────────
-; Alt + Mouse Drag — window move / resize for GlazeWM
+; Alt + mouse drag for GlazeWM.
 ;
-; Mirrors Hyprland's:
-;   bindm = SUPER, mouse:272, movewindow    → Alt + LMB drag   = move window
-;   bindm = SUPER, mouse:273, resizewindow  → Alt + RMB drag   = resize window
+; Alt + Left Button  = move the top-level window under the cursor
+; Alt + Right Button = resize the top-level window under the cursor
 ;
-; Works best with FLOATING windows (Win+Space in GlazeWM to toggle).
-; Dragging a TILED window will move it, but GlazeWM's layout engine
-; will recapture it when you release — float it first for free movement.
-;
-; Install: https://www.autohotkey.com/  (v2, NOT v1)
-; Startup: copy to shell:startup  or  Task Scheduler → trigger at logon
-; ─────────────────────────────────────────────────────────────────────────────
+; This works best with floating windows. Tiled windows can move briefly, but
+; GlazeWM may reclaim them when its layout updates.
 
-; ── Alt + Left Click drag → MOVE window ──────────────────────────────────────
-~LAlt & LButton:: {
-    ; Capture initial mouse position and window position
-    MouseGetPos(&startX, &startY, &hwnd)
-    WinGetPos(&initWinX, &initWinY, , , "ahk_id " hwnd)
+CoordMode "Mouse", "Screen"
+SetWinDelay -1
 
-    ; Drag loop — runs while LButton is held
+!LButton::MoveWindowUnderMouse()
+!RButton::ResizeWindowUnderMouse()
+
+MoveWindowUnderMouse() {
+    hwnd := GetTopLevelWindowUnderMouse()
+
+    if !hwnd {
+        return
+    }
+
+    MouseGetPos &startX, &startY
+    WinGetPos &startWinX, &startWinY, , , "ahk_id " hwnd
+
     while GetKeyState("LButton", "P") {
-        MouseGetPos(&nowX, &nowY)
-        WinMove(
-            initWinX + (nowX - startX),
-            initWinY + (nowY - startY),
-            , ,
-            "ahk_id " hwnd
-        )
-        Sleep(10)
+        MouseGetPos &nowX, &nowY
+        WinMove startWinX + nowX - startX, startWinY + nowY - startY, , , "ahk_id " hwnd
+        Sleep 10
     }
 }
 
-; ── Alt + Right Click drag → RESIZE window (from bottom-right corner) ────────
-~LAlt & RButton:: {
-    ; Capture initial mouse position and window dimensions
-    MouseGetPos(&startX, &startY, &hwnd)
-    WinGetPos( , , &initW, &initH, "ahk_id " hwnd)
+ResizeWindowUnderMouse() {
+    hwnd := GetTopLevelWindowUnderMouse()
 
-    ; Drag loop — runs while RButton is held
-    while GetKeyState("RButton", "P") {
-        MouseGetPos(&nowX, &nowY)
-        newW := Max(100, initW + (nowX - startX))
-        newH := Max(100, initH + (nowY - startY))
-        WinMove( , , newW, newH, "ahk_id " hwnd)
-        Sleep(10)
+    if !hwnd {
+        return
     }
+
+    MouseGetPos &startX, &startY
+    WinGetPos , , &startW, &startH, "ahk_id " hwnd
+
+    while GetKeyState("RButton", "P") {
+        MouseGetPos &nowX, &nowY
+        newW := Max(120, startW + nowX - startX)
+        newH := Max(120, startH + nowY - startY)
+        WinMove , , newW, newH, "ahk_id " hwnd
+        Sleep 10
+    }
+}
+
+GetTopLevelWindowUnderMouse() {
+    MouseGetPos , , &hwnd
+
+    if !hwnd {
+        return 0
+    }
+
+    root := DllCall("GetAncestor", "ptr", hwnd, "uint", 2, "ptr")
+
+    if root {
+        hwnd := root
+    }
+
+    className := WinGetClass("ahk_id " hwnd)
+    processName := WinGetProcessName("ahk_id " hwnd)
+
+    if className ~= "i)^(Progman|WorkerW|Shell_TrayWnd)$" {
+        return 0
+    }
+
+    if processName ~= "i)^(explorer\.exe|zebar\.exe|glazewm\.exe|AutoHotkey64\.exe|AutoHotkey\.exe)$" && className ~= "i)^(Shell_TrayWnd|NotifyIconOverflowWindow)$" {
+        return 0
+    }
+
+    return hwnd
 }

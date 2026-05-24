@@ -12,7 +12,10 @@ The installer copies:
 glazewm.yaml        -> %USERPROFILE%\.glzr\glazewm\config.yaml
 waybar-mirror\      -> %USERPROFILE%\.glzr\zebar\waybar-mirror\
 alt-drag.ahk        -> %USERPROFILE%\.glzr\hyprwin\alt-drag.ahk
+start-alt-drag.ps1  -> %USERPROFILE%\.glzr\hyprwin\start-alt-drag.ps1
 ```
+
+During install it rewrites the Zebar pack's `htmlPath` to the absolute installed `index.html` path required by Zebar.
 
 By default it also creates a Startup folder shortcut for the AutoHotkey alt-drag helper:
 
@@ -27,6 +30,12 @@ Useful options:
 .\install-hyprwin.ps1 -Start
 .\install-hyprwin.ps1 -NoBackup
 .\install-hyprwin.ps1 -NoAutoHotkeyStartup
+```
+
+To test the AutoHotkey helper immediately:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.glzr\hyprwin\start-alt-drag.ps1"
 ```
 
 After install, open Zebar from the tray and enable:
