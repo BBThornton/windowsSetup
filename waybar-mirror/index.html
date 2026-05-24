@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Waybar Mirror</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+    <script type="text/babel" data-type="module" data-presets="react">
+      import React, { useEffect, useMemo, useState } from "https://esm.sh/react@18.3.1";
+      import { createRoot } from "https://esm.sh/react-dom@18.3.1/client";
+      import * as zebar from "https://esm.sh/zebar";
+
+      const { createProviderGroup } = zebar;
+
+      const providers = createProviderGroup({
+        glazewm: { type: "glazewm" },
+        date: { type: "date", formatting: "HH:mm:ss" },
+        cpu: { type: "cpu", refreshInterval: 1000 },
+        memory: { type: "memory", refreshInterval: 5000 },
+        network: { type: "network", refreshInterval: 1000 },
+        audio: { type: "audio" },
+        battery: { type: "battery", refreshInterval: 5000 },
+        disk: { type: "disk", refreshInterval: 30000 },
+        media: { type: "media" },
+        weather: { type: "weather" },
+        keyboard: { type: "keyboard" },
+        systray: { type: "systray" }
+      });
+
+      const workspaceIconMap = {
+        "1": "1",
+        "2": "2",
+        "3": "3",
+        "4": "4",
+        "5": "5",
+        "6": "6",
+        "7": "7",
+        "8": "8",
+        "9": "9",
+        "10": "10"
+      };
+
+      const appIconRules = [
+        [/firefox|zen|librewolf|browser/i, ""],
+        [/chrome|chromium|edge|brave/i, ""],
+        [/terminal|wezterm|alacritty|kitty|powershell|cmd|wt/i, ""],
+        [/code|codium|vscode/i, "󰨞"],
+        [/discord|vesktop/i, ""],
+        [/signal/i, "󰍩"],
+        [/telegram/i, ""],
+        [/spotify/i, ""],
+        [/youtube/i, ""],
+        [/github/i, ""]
+      ];
+
+      function useProviders() {
+        const [outputMap, setOutputMap] = useState(providers.outputMap);
+
+        useEffect(() => {
+          const unsubscribe = providers.onOutput(() => {
+            setOutputMap({ ...providers.outputMap });
+          });
+
+          return () => {
+            if (typeof unsubscribe === "function") {
+              unsubscribe();
+            }
+          };
+        }, []);
+
+        return outputMap;
+      }
+
+      function runGlazeCommand(glazewm, command) {
+        if (glazewm?.runCommand) {
+          glazewm.runCommand(command);
+        }
+      }
+
+      function shell(program, args = "") {
+        if (zebar.shellSpawn) {
+          zebar.shellSpawn(program, args);
+        }
+      }
+
+      function formatDataSize(value) {
+        const bytes = typeof value === "number" ? value : value?.bytes;
+
+        if (!bytes) {
+          return "0B";
+        }
+
+        if (bytes < 1024) {
+          return `${bytes.toFixed(0)}B`;
+        }
+
+        if (bytes < 1048576) {
+          return `${(bytes / 1024).toFixed(0)}K`;
+        }
+
+        return `${(bytes / 1048576).toFixed(1)}M`;
+      }
+
+      function formatUsedMemory(memory) {
+        const usedBytes = memory?.usedMemory?.bytes ?? memory?.usedSize ?? memory?.usage?.bytes;
+        const usedGb = usedBytes ? usedBytes / 1073741824 : 0;
+
+        return `${usedGb.toFixed(1)}G`;
+      }
+
+      function getDiskUsage(disk) {
+        const total = disk?.totalSpace?.bytes ?? disk?.totalSpace;
+        const available = disk?.availableSpace?.bytes ?? disk?.availableSpace;
+
+        if (!total || available == null) {
+          return null;
+        }
+
+        return Math.round(((total - available) / total) * 100);
+      }
+
+      function getDefaultNetworkInterface(network) {
+        return network?.defaultInterface ?? network?.interfaces?.find((item) => item?.ipv4Addresses?.length) ?? null;
+      }
+
+      function getNetworkIcon(networkInterface) {
+        if (!networkInterface) {
+          return "󰌙";
+        }
+
+        if (networkInterface.type === "wifi") {
+          return "󰤨";
+        }
+
+        if (networkInterface.type === "ethernet") {
+          return "󰌘";
+        }
+
+        return "󰈁";
+      }
+
+      function getVolumeIcon(device) {
+        const volume = device?.volume ?? 0;
+
+        if (!device || device.isMuted || volume === 0) {
+          return "󰖁";
+        }
+
+        if (volume < 33) {
+          return "";
+        }
+
+        if (volume < 66) {
+          return "";
+        }
+
+        return "󰕾";
+      }
+
+      function getBatteryIcon(battery) {
+        const chargePercent = battery?.chargePercent ?? battery?.percentage ?? battery?.capacity;
+
+        if (battery?.isCharging) {
+          return "";
+        }
+
+        if (chargePercent == null) {
+          return "󰂑";
+        }
+
+        if (chargePercent >= 95) {
+          return "󰁹";
+        }
+
+        if (chargePercent >= 65) {
+          return "󰂀";
+        }
+
+        if (chargePercent >= 35) {
+          return "󰁾";
+        }
+
+        if (chargePercent >= 15) {
+          return "󰁻";
+        }
+
+        return "󰂎";
+      }
+
+      function getWindowIcon(windowLike) {
+        const source = `${windowLike?.processName ?? ""} ${windowLike?.className ?? ""} ${windowLike?.title ?? ""}`;
+        const match = appIconRules.find(([pattern]) => pattern.test(source));
+
+        return match?.[1] ?? "";
+      }
+
+      function getWorkspaceWindows(workspace) {
+        return workspace?.children ?? workspace?.windows ?? workspace?.containers ?? [];
+      }
+
+      function getCurrentWorkspaces(glazewm) {
+        return glazewm?.currentWorkspaces ?? glazewm?.allWorkspaces ?? glazewm?.workspaces ?? [];
+      }
+
+      function getFocusedWindow(glazewm) {
+        return glazewm?.focusedWindow ?? glazewm?.focusedContainer ?? null;
+      }
+
+      function MenuButton({ icon, title, command }) {
+        return (
+          <button className="icon-button" title={title} onClick={() => shell(command.program, command.args)}>
+            {icon}
+          </button>
+        );
+      }
+
+      function AppDrawer() {
+        return (
+          <div className="drawer app-drawer">
+            <MenuButton icon="" title="Launcher" command={{ program: "powershell", args: "-WindowStyle Hidden -Command Start-Process 'ms-windows-search:'" }} />
+            <div className="drawer-panel from-left">
+              <MenuButton icon="󰔎" title="Theme" command={{ program: "explorer", args: "ms-settings:personalization-colors" }} />
+              <MenuButton icon="" title="File Explorer" command={{ program: "explorer", args: "" }} />
+              <MenuButton icon="" title="Terminal" command={{ program: "wt", args: "" }} />
+              <MenuButton icon="" title="Browser" command={{ program: "explorer", args: "https://" }} />
+              <MenuButton icon="" title="Settings" command={{ program: "explorer", args: "ms-settings:" }} />
+            </div>
+          </div>
+        );
+      }
+
+      function NotifyGroup() {
+        return (
+          <div className="drawer notify-drawer">
+            <button className="icon-button" title="Notifications" onClick={() => shell("explorer", "ms-actioncenter:")}>
+              
+            </button>
+            <div className="drawer-panel from-left compact-panel">
+              <button className="icon-button" title="Windows Update" onClick={() => shell("explorer", "ms-settings:windowsupdate")}>
+                󰁈
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      function Workspaces({ glazewm }) {
+        const workspaces = getCurrentWorkspaces(glazewm);
+
+        return (
+          <div className="workspaces" onWheel={(event) => runGlazeCommand(glazewm, event.deltaY > 0 ? "focus-next-workspace" : "focus-prev-workspace")}>
+            {workspaces.map((workspace) => {
+              const windows = getWorkspaceWindows(workspace);
+              const isFocused = workspace.hasFocus || workspace.isFocused || glazewm?.displayedWorkspace?.name === workspace.name;
+              const isDisplayed = workspace.isDisplayed || glazewm?.displayedWorkspace?.name === workspace.name;
+
+              return (
+                <button
+                  key={workspace.id ?? workspace.name}
+                  className={`workspace ${isFocused ? "active" : ""} ${isDisplayed ? "displayed" : ""}`}
+                  title={`Workspace ${workspace.name}`}
+                  onClick={() => runGlazeCommand(glazewm, `focus-workspace ${workspace.name}`)}
+                >
+                  <span>{workspaceIconMap[workspace.name] ?? workspace.displayName ?? workspace.name}</span>
+                  {windows.length > 0 && (
+                    <span className="workspace-windows">
+                      {windows.slice(0, 4).map((windowLike, index) => (
+                        <span key={`${workspace.name}-${index}`}>{getWindowIcon(windowLike)}</span>
+                      ))}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        );
+      }
+
+      function Player({ media }) {
+        const session = media?.currentSession ?? media?.sessions?.[0];
+        const artist = session?.artist ?? session?.metadata?.artist;
+        const title = session?.title ?? session?.metadata?.title;
+        const label = [artist, title].filter(Boolean).join("  ");
+
+        return (
+          <button className={`player ${label ? "" : "is-empty"}`} title={label || "Media"} onClick={() => media?.previous?.()} onAuxClick={() => media?.playPause?.()}>
+            <span></span>
+            <span>{label || "No media"}</span>
+          </button>
+        );
+      }
+
+      function WindowTitle({ glazewm }) {
+        const focusedWindow = getFocusedWindow(glazewm);
+
+        return (
+          <div className="window-title" title={focusedWindow?.title ?? ""}>
+            {focusedWindow?.title ? `${getWindowIcon(focusedWindow)} ${focusedWindow.title}` : ""}
+          </div>
+        );
+      }
+
+      function Weather({ weather }) {
+        const current = weather?.current;
+        const temperature = current?.temperatureCelsius ?? current?.temperature?.celsius ?? current?.tempC;
+        const condition = current?.condition ?? current?.weatherDescription ?? weather?.status;
+
+        if (temperature == null && !condition) {
+          return <span className="module weather muted">󰖐</span>;
+        }
+
+        return (
+          <span className="module weather" title={condition ?? "Weather"}>
+            󰖐 {temperature != null ? `${Math.round(temperature)}C` : condition}
+          </span>
+        );
+      }
+
+      function MotherboardDrawer({ cpu, memory, disk, battery }) {
+        const mainDisk = disk?.disks?.find((item) => !item.isRemovable) ?? disk?.disks?.[0];
+        const diskUsage = getDiskUsage(mainDisk);
+        const chargePercent = battery?.chargePercent ?? battery?.percentage ?? battery?.capacity;
+
+        return (
+          <div className="drawer mobo-drawer">
+            <span className={`module temperature ${cpu?.usage > 90 ? "critical" : ""}`}>󰈸</span>
+            <div className="drawer-panel from-right">
+              <span className={`module cpu ${cpu?.usage > 90 ? "critical" : cpu?.usage > 70 ? "warning" : ""}`}>
+                {Math.round(cpu?.usage ?? 0)}% 󰍛
+              </span>
+              <span className="module power-profile"></span>
+              <span className="module memory">{formatUsedMemory(memory)} 󰾆</span>
+              {diskUsage != null && <span className="module disk">{diskUsage}% 󰋊</span>}
+              {chargePercent != null && (
+                <span className={`module battery ${chargePercent <= 15 ? "critical" : ""}`}>
+                  {getBatteryIcon(battery)} {Math.round(chargePercent)}%
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      function AudioDrawer({ audio }) {
+        const playback = audio?.defaultPlaybackDevice;
+        const recording = audio?.defaultRecordingDevice;
+
+        return (
+          <div className="drawer audio-drawer">
+            <button className={`module audio ${playback?.isMuted ? "muted" : ""}`} title={playback?.name ?? "Audio"} onClick={() => audio?.toggleMute?.()}>
+              {getVolumeIcon(playback)} {playback?.isMuted ? "" : `${Math.round(playback?.volume ?? 0)}%`}
+            </button>
+            <div className="drawer-panel from-right compact-panel">
+              <button className={`module mic ${recording?.isMuted ? "muted" : ""}`} title={recording?.name ?? "Microphone"} onClick={() => audio?.toggleMute?.({ deviceType: "recording" })}>
+                {recording?.isMuted ? "" : ""} {Math.round(recording?.volume ?? 0)}%
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      function NetworkSpeed({ network }) {
+        const networkInterface = getDefaultNetworkInterface(network);
+        const transmit = networkInterface?.transmitSpeed ?? networkInterface?.txBytesPerSec ?? networkInterface?.bandwidthUpBytes;
+        const receive = networkInterface?.receiveSpeed ?? networkInterface?.rxBytesPerSec ?? networkInterface?.bandwidthDownBytes;
+
+        return (
+          <span className="module network" title={networkInterface?.name ?? "Network"}>
+            {getNetworkIcon(networkInterface)}  {formatDataSize(transmit)}  {formatDataSize(receive)}
+          </span>
+        );
+      }
+
+      function Tray({ systray }) {
+        const items = systray?.items ?? systray?.icons ?? [];
+
+        return (
+          <div className="tray">
+            {items.map((item, index) => (
+              <button key={item.id ?? item.tooltip ?? index} className="tray-button" title={item.tooltip ?? item.title ?? ""} onClick={() => item.onLeftClick?.()}>
+                {item.iconUrl ? <img src={item.iconUrl} alt="" /> : <span>{item.icon ?? "●"}</span>}
+              </button>
+            ))}
+          </div>
+        );
+      }
+
+      function StatusDrawer({ keyboard }) {
+        const capsActive = keyboard?.capsLock || keyboard?.capslock;
+
+        return (
+          <div className="drawer status-drawer">
+            <button className="icon-button power" title="Power dialog" onClick={() => shell("shutdown", "/i")}>
+              ⏻
+            </button>
+            <div className="drawer-panel from-right">
+              <button className="icon-button" title="Lock" onClick={() => shell("rundll32.exe", "user32.dll,LockWorkStation")}>
+                󰌾
+              </button>
+              <span className={`module keyboard ${capsActive ? "active" : ""}`}>󰪛 {capsActive ? "" : ""}</span>
+            </div>
+          </div>
+        );
+      }
+
+      function App() {
+        const output = useProviders();
+        const glazewm = output.glazewm;
+
+        const orderedOutput = useMemo(() => ({
+          audio: output.audio,
+          battery: output.battery,
+          cpu: output.cpu,
+          date: output.date,
+          disk: output.disk,
+          keyboard: output.keyboard,
+          media: output.media,
+          memory: output.memory,
+          network: output.network,
+          systray: output.systray,
+          weather: output.weather
+        }), [output]);
+
+        return (
+          <main className="bar">
+            <section className="left">
+              <span className="cava">▁▂▃▄▅▆▇</span>
+              <Player media={orderedOutput.media} />
+              <span className="separator blank" />
+              <WindowTitle glazewm={glazewm} />
+            </section>
+
+            <section className="center">
+              <AppDrawer />
+              <span className="separator"></span>
+              <NotifyGroup />
+              <span className="separator"></span>
+              <Workspaces glazewm={glazewm} />
+              <span className="clock"> {orderedOutput.date?.formatted ?? "--:--:--"}</span>
+              <span className="separator"></span>
+              <Weather weather={orderedOutput.weather} />
+              <span className="separator"></span>
+              <button className="icon-button" title="Idle inhibitor placeholder">
+                
+              </button>
+              <button className="hint" title="Keybind hints" onClick={() => shell("notepad")}>
+                󰺁 HINT!
+              </button>
+            </section>
+
+            <section className="right">
+              <Tray systray={orderedOutput.systray} />
+              <NetworkSpeed network={orderedOutput.network} />
+              <span className="separator"></span>
+              <MotherboardDrawer cpu={orderedOutput.cpu} memory={orderedOutput.memory} disk={orderedOutput.disk} battery={orderedOutput.battery} />
+              <span className="separator">|</span>
+              <AudioDrawer audio={orderedOutput.audio} />
+              <span className="separator"></span>
+              <button className="icon-button nightlight" title="Night light" onClick={() => shell("explorer", "ms-settings:nightlight")}>
+                󰖔
+              </button>
+              <span className="separator"></span>
+              <StatusDrawer keyboard={orderedOutput.keyboard} />
+            </section>
+          </main>
+        );
+      }
+
+      createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>

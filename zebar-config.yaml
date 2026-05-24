@@ -1,0 +1,15 @@
+# Legacy note
+#
+# Zebar v3 uses widget packs under:
+#
+#   %USERPROFILE%\.glzr\zebar\<pack-name>\zpack.json
+#
+# This repo now keeps the Waybar-mirrored Zebar config in:
+#
+#   waybar-mirror/
+#
+# Install it with:
+#
+#   powershell -ExecutionPolicy Bypass -File .\install-zebar.ps1
+#
+# See INSTALL-ZEBAR.md for the exact GUI steps to enable the widget.

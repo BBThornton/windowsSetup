@@ -1,0 +1,319 @@
+general:
+  # Run Zebar on startup.
+  startup_commands:
+    - "shell-exec zebar"
+
+  shutdown_commands:
+    - "shell-exec taskkill /IM zebar.exe /F"
+
+  config_reload_commands: []
+
+  # Focus the window under the cursor when the cursor moves (mirrors Hyprland follow_mouse = 1)
+  focus_follows_cursor: true
+
+  # Jump cursor to newly focused window (mirrors Hyprland cursor_jump)
+  cursor_jump:
+    enabled: true
+    trigger: "window_focus"
+
+  # Pressing the focused workspace key goes back to the previous one
+  toggle_workspace_on_refocus: true
+
+  # Current GlazeWM default/recommended workspace hiding behavior.
+  hide_method: "cloak"
+  show_all_in_taskbar: false
+
+gaps:
+  scale_with_dpi: true
+  # inner_gap = 2 (matches Hyprland general.gaps_in = 2)
+  inner_gap: "2px"
+  # outer_gap top accounts for the 30px Zebar bar + 4px gap
+  # other sides match Hyprland general.gaps_out = 4
+  outer_gap:
+    top: "34px"
+    right: "4px"
+    bottom: "4px"
+    left: "4px"
+  # Keep Hyprland's thin top-bar reserve when only one window is tiled.
+  single_window_outer_gap:
+    top: "34px"
+    right: "4px"
+    bottom: "4px"
+    left: "4px"
+
+# Window border effects — closest equivalent to Hyprland's col.active_border / col.inactive_border
+# Note: border_width in DWM is capped at ~1–2px on Windows 10; Windows 11 supports thicker via DWM API
+window_effects:
+  focused_window:
+    border:
+      enabled: true
+      color: "#7aa2f7"  # Hyprland uses wallust $color12 — fixed to a Tokyo Night blue
+    hide_title_bar:
+      enabled: false
+    corner_style:
+      enabled: true
+      style: "rounded"
+  other_windows:
+    border:
+      enabled: true
+      color: "#3b4261"  # Hyprland uses wallust $color10 — fixed to Tokyo Night comment
+    hide_title_bar:
+      enabled: false
+    corner_style:
+      enabled: true
+      style: "rounded"
+
+window_behavior:
+  # New windows tile by default
+  initial_state: "tiling"
+  state_defaults:
+    floating:
+      centered: true
+      shown_on_top: false
+    fullscreen:
+      maximized: false
+      shown_on_top: false
+
+workspaces:
+  - name: "1"
+  - name: "2"
+  - name: "3"
+  - name: "4"
+  - name: "5"
+  - name: "6"
+  - name: "7"
+  - name: "8"
+  - name: "9"
+  - name: "10"
+
+window_rules:
+  # ─── Ignore: Windows shell overlays GlazeWM must not tile ────────────────────
+  - commands: ["ignore"]
+    match:
+      - window_process: { equals: "zebar" }
+      - window_process: { equals: "SearchHost" }
+      - window_process: { equals: "SearchApp" }
+      - window_process: { equals: "Cortana" }
+      - window_process: { equals: "ShellExperienceHost" }
+      - window_process: { equals: "StartMenuExperienceHost" }
+      - window_process: { equals: "TextInputHost" }
+      - window_process: { equals: "PowerToys" }
+        window_class: { regex: "HwndWrapper\\[PowerToys\\.PowerAccent.*?\\]" }
+      - window_title: { equals: "Command Palette" }
+        window_class: { equals: "WinUIDesktopWin32WindowClass" }
+      - window_process: { equals: "PowerToys" }
+        window_title: { regex: ".*? - Peek" }
+      - window_title: { regex: "[Pp]icture.in.[Pp]icture" }
+        window_class: { regex: "Chrome_WidgetWin_1|MozillaDialogClass" }
+
+  # ─── Float: dialogs and small utility apps ───────────────────────────────────
+  - commands: ["set-floating --centered"]
+    match:
+      - window_process: { equals: "calc" }
+      - window_process: { equals: "CalculatorApp" }
+      - window_process: { equals: "Zoom" }
+      - window_process: { equals: "OneDrive" }
+      - window_process: { equals: "consent" }
+      - window_process: { equals: "UserAccountControlSettings" }
+      - window_title: { equals: "Authentication Required" }
+      - window_title: { equals: "Save As" }
+      - window_title: { equals: "Add Folder to Workspace" }
+      - window_title: { equals: "Open Files" }
+
+keybindings:
+  # ─── Application launchers ───────────────────────────────────────────────────
+
+  # Open Windows Terminal (Super+Return → win+enter)
+  - bindings: ["win+enter"]
+    commands: ["shell-exec wt"]
+
+  # Open File Explorer (Super+E → win+e)
+  - bindings: ["win+e"]
+    commands: ["shell-exec explorer"]
+
+  # Open PowerToys Run (Super+D → win+d)
+  # Set PowerToys Run's activation hotkey TO Win+D inside PowerToys Settings,
+  # then GlazeWM will hand off the keypress and PowerToys Run will intercept it.
+  # Alternatively, bind to your preferred launcher below.
+  - bindings: ["win+d"]
+    commands: ["shell-exec --hide-window powershell -WindowStyle Hidden -Command \"Start-Process 'ms-windows-search:'\""]
+
+  # ─── Window management ───────────────────────────────────────────────────────
+
+  # Close focused window (Super+Q)
+  - bindings: ["win+q"]
+    commands: ["close"]
+
+  # Toggle floating (Super+Space)
+  - bindings: ["win+space"]
+    commands: ["toggle-floating --centered"]
+
+  # Toggle fullscreen (Super+Shift+F)
+  - bindings: ["win+shift+f"]
+    commands: ["toggle-fullscreen"]
+
+  # Toggle maximized (Super+Ctrl+F — closest to Hyprland fakefullscreen/maximize)
+  - bindings: ["win+ctrl+f"]
+    commands: ["toggle-fullscreen --maximized"]
+
+  # Toggle tiling split direction (Super+P — closest to Hyprland dwindle pseudo/toggle-split)
+  - bindings: ["win+p"]
+    commands: ["toggle-tiling-direction"]
+
+  # ─── Focus direction (Super+Arrow) ───────────────────────────────────────────
+
+  - bindings: ["win+left"]
+    commands: ["focus --direction left"]
+  - bindings: ["win+right"]
+    commands: ["focus --direction right"]
+  - bindings: ["win+up"]
+    commands: ["focus --direction up"]
+  - bindings: ["win+down"]
+    commands: ["focus --direction down"]
+
+  # ─── Move window in layout (Super+Ctrl+Arrow) ────────────────────────────────
+
+  - bindings: ["win+ctrl+left"]
+    commands: ["move --direction left"]
+  - bindings: ["win+ctrl+right"]
+    commands: ["move --direction right"]
+  - bindings: ["win+ctrl+up"]
+    commands: ["move --direction up"]
+  - bindings: ["win+ctrl+down"]
+    commands: ["move --direction down"]
+
+  # ─── Resize window (Super+Shift+Arrow, 50px to match Hyprland) ───────────────
+
+  - bindings: ["win+shift+left"]
+    commands: ["resize --width -50px"]
+  - bindings: ["win+shift+right"]
+    commands: ["resize --width +50px"]
+  - bindings: ["win+shift+up"]
+    commands: ["resize --height -50px"]
+  - bindings: ["win+shift+down"]
+    commands: ["resize --height +50px"]
+
+  # ─── Workspace focus (Super+1–9 and Super+0 = workspace 10) ──────────────────
+
+  - bindings: ["win+1"]
+    commands: ["focus --workspace 1"]
+  - bindings: ["win+2"]
+    commands: ["focus --workspace 2"]
+  - bindings: ["win+3"]
+    commands: ["focus --workspace 3"]
+  - bindings: ["win+4"]
+    commands: ["focus --workspace 4"]
+  - bindings: ["win+5"]
+    commands: ["focus --workspace 5"]
+  - bindings: ["win+6"]
+    commands: ["focus --workspace 6"]
+  - bindings: ["win+7"]
+    commands: ["focus --workspace 7"]
+  - bindings: ["win+8"]
+    commands: ["focus --workspace 8"]
+  - bindings: ["win+9"]
+    commands: ["focus --workspace 9"]
+  - bindings: ["win+0"]
+    commands: ["focus --workspace 10"]
+
+  # ─── Move window to workspace, follow it (Super+Shift+1–0) ───────────────────
+
+  - bindings: ["win+shift+1"]
+    commands: ["move --workspace 1", "focus --workspace 1"]
+  - bindings: ["win+shift+2"]
+    commands: ["move --workspace 2", "focus --workspace 2"]
+  - bindings: ["win+shift+3"]
+    commands: ["move --workspace 3", "focus --workspace 3"]
+  - bindings: ["win+shift+4"]
+    commands: ["move --workspace 4", "focus --workspace 4"]
+  - bindings: ["win+shift+5"]
+    commands: ["move --workspace 5", "focus --workspace 5"]
+  - bindings: ["win+shift+6"]
+    commands: ["move --workspace 6", "focus --workspace 6"]
+  - bindings: ["win+shift+7"]
+    commands: ["move --workspace 7", "focus --workspace 7"]
+  - bindings: ["win+shift+8"]
+    commands: ["move --workspace 8", "focus --workspace 8"]
+  - bindings: ["win+shift+9"]
+    commands: ["move --workspace 9", "focus --workspace 9"]
+  - bindings: ["win+shift+0"]
+    commands: ["move --workspace 10", "focus --workspace 10"]
+
+  # ─── Move window to workspace silently (Super+Ctrl+1–0) ─────────────────────
+  # Matches Hyprland's movetoworkspacesilent bindings.
+
+  - bindings: ["win+ctrl+1"]
+    commands: ["move --workspace 1"]
+  - bindings: ["win+ctrl+2"]
+    commands: ["move --workspace 2"]
+  - bindings: ["win+ctrl+3"]
+    commands: ["move --workspace 3"]
+  - bindings: ["win+ctrl+4"]
+    commands: ["move --workspace 4"]
+  - bindings: ["win+ctrl+5"]
+    commands: ["move --workspace 5"]
+  - bindings: ["win+ctrl+6"]
+    commands: ["move --workspace 6"]
+  - bindings: ["win+ctrl+7"]
+    commands: ["move --workspace 7"]
+  - bindings: ["win+ctrl+8"]
+    commands: ["move --workspace 8"]
+  - bindings: ["win+ctrl+9"]
+    commands: ["move --workspace 9"]
+  - bindings: ["win+ctrl+0"]
+    commands: ["move --workspace 10"]
+
+  # ─── Cycle workspaces (Super+Tab / Super+Shift+Tab) ──────────────────────────
+
+  - bindings: ["win+tab"]
+    commands: ["focus --next-active-workspace"]
+  - bindings: ["win+shift+tab"]
+    commands: ["focus --prev-active-workspace"]
+
+  # ─── Move window to next/prev workspace (Super+Shift+] / [) ──────────────────
+
+  - bindings: ["win+shift+oem_close_brackets"]
+    commands: ["move --next-workspace", "focus --next-workspace"]
+  - bindings: ["win+shift+oem_open_brackets"]
+    commands: ["move --prev-workspace", "focus --prev-workspace"]
+
+  # Move window to next/prev workspace silently (Super+Ctrl+] / [)
+  - bindings: ["win+ctrl+oem_close_brackets"]
+    commands: ["move --next-workspace"]
+  - bindings: ["win+ctrl+oem_open_brackets"]
+    commands: ["move --prev-workspace"]
+
+  # ─── Cycle windows (Alt+Tab) ─────────────────────────────────────────────────
+  # Note: Windows intercepts Alt+Tab natively. GlazeWM may not fully override it.
+  # If it doesn't work, rebind to win+grave (backtick) instead.
+
+  - bindings: ["alt+tab"]
+    commands: ["wm-cycle-focus --omit-minimized"]
+  - bindings: ["alt+shift+tab"]
+    commands: ["wm-cycle-focus --omit-minimized"]
+
+  # Match Hyprland's move-current-workspace-to-monitor bindings.
+  - bindings: ["win+ctrl+f9"]
+    commands: ["move-workspace --direction left"]
+  - bindings: ["win+ctrl+f10"]
+    commands: ["move-workspace --direction right"]
+  - bindings: ["win+ctrl+f11"]
+    commands: ["move-workspace --direction up"]
+  - bindings: ["win+ctrl+f12"]
+    commands: ["move-workspace --direction down"]
+
+  # Current GlazeWM utility bindings.
+  - bindings: ["win+alt+p"]
+    commands: ["wm-toggle-pause"]
+  - bindings: ["win+alt+w"]
+    commands: ["wm-redraw"]
+
+  # ─── WM control ──────────────────────────────────────────────────────────────
+
+  # Reload GlazeWM config (Super+Alt+R — mirrors Hyprland refresh bar/menus)
+  - bindings: ["win+alt+r"]
+    commands: ["wm-reload-config"]
+
+  # Exit GlazeWM (Super+Ctrl+Alt+Delete equivalent)
+  - bindings: ["win+ctrl+alt+q"]
+    commands: ["wm-exit"]

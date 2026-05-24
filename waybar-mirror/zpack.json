@@ -1,0 +1,64 @@
+{
+  "name": "Waybar Mirror",
+  "version": "1.0.0",
+  "description": "A Zebar v3 widget pack that mirrors this machine's Waybar TOP-Default layout.",
+  "tags": ["glazewm", "waybar", "statusbar"],
+  "widgets": [
+    {
+      "name": "Top Bar",
+      "htmlPath": "index.html",
+      "zOrder": "top_most",
+      "shownInTaskbar": false,
+      "focused": false,
+      "resizable": false,
+      "transparent": true,
+      "includeFiles": ["styles.css"],
+      "privileges": {
+        "shellCommands": [
+          {
+            "program": "powershell",
+            "argsRegex": ".*"
+          },
+          {
+            "program": "explorer",
+            "argsRegex": ".*"
+          },
+          {
+            "program": "wt",
+            "argsRegex": ".*"
+          },
+          {
+            "program": "rundll32.exe",
+            "argsRegex": ".*"
+          },
+          {
+            "program": "shutdown",
+            "argsRegex": ".*"
+          },
+          {
+            "program": "notepad",
+            "argsRegex": ".*"
+          }
+        ]
+      },
+      "presets": [
+        {
+          "name": "Primary top dock",
+          "anchor": "top_left",
+          "offsetX": "0px",
+          "offsetY": "0px",
+          "width": "100%",
+          "height": "34px",
+          "monitorSelection": {
+            "type": "primary"
+          },
+          "dockToEdge": {
+            "enabled": true,
+            "edge": "top",
+            "windowMargin": "34px"
+          }
+        }
+      ]
+    }
+  ]
+}
