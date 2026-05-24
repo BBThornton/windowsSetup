@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
   [switch]$NoBackup,
-  [switch]$NoAutoHotkeyStartup,
+  [switch]$NoAltSnapStartup,
   [switch]$NoFontInstall,
   [switch]$ForceFontInstall,
   [switch]$CleanZebarBackups,
@@ -20,6 +20,7 @@ $StartupRoot = [Environment]::GetFolderPath("Startup")
 
 $Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $JetBrainsMonoNerdFontUrl = "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip"
+$AltSnapUrl = "https://github.com/RamonUnch/AltSnap/releases/latest/download/AltSnap.exe"
 
 function Remove-ZebarBackups {
   $BackupPattern = Join-Path $ZebarRoot "waybar-mirror.backup-*"
@@ -235,22 +236,14 @@ function Install-JetBrainsMonoNerdFont {
   Write-Host "Restart Zebar and any terminals/apps that need the font."
 }
 
-function Resolve-AutoHotkey {
-  $Candidates = @(
-    (Get-Command "AutoHotkey64.exe" -ErrorAction SilentlyContinue).Source,
-    (Get-Command "AutoHotkey.exe" -ErrorAction SilentlyContinue).Source
-  )
+function Install-AltSnap {
+  param([Parameter(Mandatory)] [string]$Destination)
 
-  foreach ($ProgramRoot in @($env:ProgramFiles, ${env:ProgramFiles(x86)})) {
-    if ($ProgramRoot) {
-      $Candidates += Join-Path $ProgramRoot "AutoHotkey\v2\AutoHotkey64.exe"
-      $Candidates += Join-Path $ProgramRoot "AutoHotkey\v2\AutoHotkey.exe"
-    }
-  }
-
-  $Candidates = $Candidates | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) }
-
-  return $Candidates | Select-Object -First 1
+  $Parent = Split-Path -Parent $Destination
+  New-Item -ItemType Directory -Force -Path $Parent | Out-Null
+  Write-Host "Downloading AltSnap..."
+  Invoke-WebRequest -Uri $AltSnapUrl -OutFile $Destination
+  Write-Host "Installed AltSnap: $Destination"
 }
 
 function New-StartupShortcut {
@@ -259,22 +252,13 @@ function New-StartupShortcut {
     [Parameter(Mandatory)] [string]$TargetPath
   )
 
-  $AutoHotkey = Resolve-AutoHotkey
-
-  if (-not $AutoHotkey) {
-    Write-Warning "AutoHotkey v2 was not found. Installed alt-drag.ahk, but did not create a startup shortcut."
-    Write-Warning "Install AutoHotkey v2, then rerun this script or launch $TargetPath manually."
-    return
-  }
-
   New-Item -ItemType Directory -Force -Path (Split-Path -Parent $ShortcutPath) | Out-Null
 
   $Shell = New-Object -ComObject WScript.Shell
   $Shortcut = $Shell.CreateShortcut($ShortcutPath)
-  $Shortcut.TargetPath = $AutoHotkey
-  $Shortcut.Arguments = "`"$TargetPath`""
+  $Shortcut.TargetPath = $TargetPath
   $Shortcut.WorkingDirectory = Split-Path -Parent $TargetPath
-  $Shortcut.Description = "Hyprwin Alt-drag helper"
+  $Shortcut.Description = "Hyprwin AltSnap helper"
   $Shortcut.Save()
 
   Write-Host "Installed startup shortcut: $ShortcutPath"
@@ -288,12 +272,11 @@ function Invoke-OptionalStart {
   if ($Restart) {
     Get-Process -Name "zebar" -ErrorAction SilentlyContinue | Stop-Process -Force
     Get-Process -Name "glazewm" -ErrorAction SilentlyContinue | Stop-Process -Force
-    Get-Process -Name "AutoHotkey64", "AutoHotkey" -ErrorAction SilentlyContinue | Stop-Process -Force
+    Get-Process -Name "AltSnap" -ErrorAction SilentlyContinue | Stop-Process -Force
   }
 
   $Glaze = Get-Command "glazewm.exe" -ErrorAction SilentlyContinue
   $Zebar = Get-Command "zebar.exe" -ErrorAction SilentlyContinue
-  $AutoHotkey = Resolve-AutoHotkey
 
   if ($Glaze) {
     Start-Process -FilePath $Glaze.Source
@@ -309,9 +292,9 @@ function Invoke-OptionalStart {
     Write-Warning "zebar.exe was not found on PATH. GlazeWM startup_commands may still start it if configured."
   }
 
-  if ($AutoHotkey) {
-    Start-Process -FilePath $AutoHotkey -ArgumentList "`"$(Join-Path $HyprwinRoot "alt-drag.ahk")`""
-    Write-Host "Started AutoHotkey alt-drag helper."
+  if (Test-Path -LiteralPath $AltSnapTarget -PathType Leaf) {
+    Start-Process -FilePath $AltSnapTarget -WorkingDirectory $HyprwinRoot
+    Write-Host "Started AltSnap."
   }
 }
 
@@ -319,11 +302,10 @@ $GlazeConfigSource = Join-Path $RepoRoot "glazewm.yaml"
 $GlazeConfigTarget = Join-Path $GlazeRoot "config.yaml"
 $ZebarPackSource = Join-Path $RepoRoot "waybar-mirror"
 $ZebarPackTarget = Join-Path $ZebarRoot "waybar-mirror"
-$AutoHotkeySource = Join-Path $RepoRoot "alt-drag.ahk"
-$AutoHotkeyTarget = Join-Path $HyprwinRoot "alt-drag.ahk"
-$AutoHotkeyStartSource = Join-Path $RepoRoot "start-alt-drag.ps1"
-$AutoHotkeyStartTarget = Join-Path $HyprwinRoot "start-alt-drag.ps1"
-$AutoHotkeyShortcut = Join-Path $StartupRoot "hyprwin-alt-drag.lnk"
+$AltSnapTarget = Join-Path $HyprwinRoot "AltSnap.exe"
+$AltSnapIniSource = Join-Path $RepoRoot "AltSnap.ini"
+$AltSnapIniTarget = Join-Path $HyprwinRoot "AltSnap.ini"
+$AltSnapShortcut = Join-Path $StartupRoot "hyprwin-altsnap.lnk"
 
 if ($CleanZebarBackups) {
   Remove-ZebarBackups
@@ -337,13 +319,13 @@ if (-not $NoFontInstall) {
 
 Install-File -Source $GlazeConfigSource -Destination $GlazeConfigTarget
 Install-Directory -Source $ZebarPackSource -Destination $ZebarPackTarget
-Install-File -Source $AutoHotkeySource -Destination $AutoHotkeyTarget
-Install-File -Source $AutoHotkeyStartSource -Destination $AutoHotkeyStartTarget
+Install-AltSnap -Destination $AltSnapTarget
+Install-File -Source $AltSnapIniSource -Destination $AltSnapIniTarget
 
-if (-not $NoAutoHotkeyStartup) {
-  New-StartupShortcut -ShortcutPath $AutoHotkeyShortcut -TargetPath $AutoHotkeyTarget
+if (-not $NoAltSnapStartup) {
+  New-StartupShortcut -ShortcutPath $AltSnapShortcut -TargetPath $AltSnapTarget
 } else {
-  Write-Host "Skipped AutoHotkey startup shortcut."
+  Write-Host "Skipped AltSnap startup shortcut."
 }
 
 Invoke-OptionalStart
@@ -352,7 +334,7 @@ Write-Host ""
 Write-Host "Hyprwin install complete."
 Write-Host "GlazeWM config: $GlazeConfigTarget"
 Write-Host "Zebar pack:     $ZebarPackTarget"
-Write-Host "Alt-drag AHK:   $AutoHotkeyTarget"
+Write-Host "AltSnap:        $AltSnapTarget"
 Write-Host ""
 Write-Host "In Zebar, enable: Widget packs -> Waybar Mirror -> Top Bar."
 Write-Host "In Zebar, also enable Run on startup for that widget if desired."
