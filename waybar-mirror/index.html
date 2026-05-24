@@ -45,7 +45,10 @@
       </section>
 
       <section class="right">
-        <button class="icon-button tray-flyout" data-shell="trayFlyout" title="Open Windows notification area icons">▴</button>
+        <div id="tray-drawer" class="drawer tray-drawer">
+          <button id="tray-toggle" class="icon-button tray-toggle" data-action="tray-toggle" title="Toggle tray icons">▴</button>
+          <div id="tray-panel" class="drawer-panel tray-panel from-right"></div>
+        </div>
         <div id="tray" class="tray"></div>
         <button id="network" class="module network" data-shell="wifi" title="Open Wi-Fi networks">󰌙 idle</button>
         <span class="separator">·</span>
@@ -111,6 +114,9 @@
         playerText: document.getElementById("player-text"),
         temperature: document.getElementById("temperature"),
         tray: document.getElementById("tray"),
+        trayDrawer: document.getElementById("tray-drawer"),
+        trayPanel: document.getElementById("tray-panel"),
+        trayToggle: document.getElementById("tray-toggle"),
         weather: document.getElementById("weather"),
         windowTitle: document.getElementById("window-title"),
         workspaces: document.getElementById("workspaces")
@@ -120,6 +126,8 @@
       let previousPlaybackVolume = 40;
       let previousWorkspaceSignature = "";
       let previousTraySignature = "";
+      let isTrayExpanded = false;
+      const visibleTrayIconCount = 4;
 
       function spawnShell(program, args = "") {
         if (!zebar.shellSpawn) {
@@ -145,7 +153,6 @@
           settings: ["explorer.exe", "ms-settings:"],
           notifications: ["explorer.exe", "ms-actioncenter:"],
           update: ["explorer.exe", "ms-settings:windowsupdate"],
-          trayFlyout: ["explorer.exe", "shell:::{05d7b0f4-2121-4eff-bf6b-ed3f69b894d9}"],
           wifi: ["powershell.exe", "-WindowStyle Hidden -Command Start-Process 'ms-availablenetworks:'"],
           audioSettings: ["explorer.exe", "ms-settings:sound"],
           taskManager: ["taskmgr.exe", ""],
@@ -247,16 +254,39 @@
         const rules = [
           [/firefox|zen|librewolf|browser/i, ""],
           [/chrome|chromium|edge|brave/i, ""],
-          [/terminal|wezterm|alacritty|kitty|powershell|cmd|wt/i, ""],
-          [/code|codium|vscode/i, "󰨞"],
+          [/terminal|wezterm|alacritty|kitty|powershell|pwsh|cmd|wt|windows terminal/i, ""],
+          [/code|codium|vscode|visual studio code/i, "󰨞"],
+          [/visual studio|devenv/i, ""],
+          [/jetbrains|idea|webstorm|pycharm|rider|clion|goland|phpstorm|rubymine/i, ""],
+          [/explorer|file explorer/i, ""],
           [/discord|vesktop/i, ""],
+          [/slack/i, ""],
+          [/teams|msteams/i, "󰊻"],
           [/signal/i, "󰍩"],
           [/telegram/i, ""],
           [/spotify/i, ""],
           [/youtube/i, ""],
-          [/github/i, ""]
+          [/github|git/i, ""],
+          [/obsidian/i, "󰠮"],
+          [/notion/i, ""],
+          [/onenote/i, "󰝒"],
+          [/outlook|mail/i, "󰇮"],
+          [/word|winword/i, "󰈬"],
+          [/excel/i, "󰈛"],
+          [/powerpoint/i, "󰈧"],
+          [/photoshop/i, ""],
+          [/illustrator/i, ""],
+          [/figma/i, ""],
+          [/steam/i, ""],
+          [/docker/i, ""],
+          [/obs64|obs studio/i, "󰐌"],
+          [/vlc/i, "󰕼"],
+          [/notepad/i, "󰎞"],
+          [/calculator/i, ""],
+          [/settings|systemsettings/i, ""],
+          [/taskmgr|task manager/i, ""]
         ];
-        return rules.find(([pattern]) => pattern.test(source))?.[1] ?? "";
+        return rules.find(([pattern]) => pattern.test(source))?.[1] ?? "";
       }
 
       function getWeatherIcon(weather) {
@@ -358,61 +388,72 @@
 
       function updateTray(systray) {
         const items = systray?.items ?? systray?.icons ?? [];
-        const visibleItems = items.slice(0, 10);
-        const signature = JSON.stringify(visibleItems.map((item) => [item.id, item.iconHash, item.iconUrl, item.tooltip ?? item.title]));
+        const compactItems = items.slice(0, visibleTrayIconCount);
+        const signature = JSON.stringify({
+          expanded: isTrayExpanded,
+          items: items.map((item) => [item.id, item.iconHash, item.iconUrl, item.tooltip ?? item.title])
+        });
 
         if (signature === previousTraySignature) return;
         previousTraySignature = signature;
-        elements.tray.replaceChildren(...visibleItems.map((item) => {
-          const icon = document.createElement("span");
-          icon.className = "tray-icon";
-          icon.dataset.trayIcon = item.id;
-          icon.title = item.tooltip ?? item.title ?? "";
 
-          if (item.iconUrl) {
-            const image = document.createElement("img");
-            image.src = item.iconUrl;
-            image.alt = "";
-            icon.append(image);
-          } else {
-            icon.textContent = item.icon ?? "●";
-          }
+        elements.tray.replaceChildren(...compactItems.map((item) => createTrayIcon(item, systray)));
+        elements.trayPanel.replaceChildren(...items.map((item) => createTrayIcon(item, systray)));
 
-          icon.addEventListener("click", () => systray?.onLeftClick?.(item.id));
-          icon.addEventListener("dblclick", () => systray?.onLeftDoubleClick?.(item.id));
-          icon.addEventListener("contextmenu", (event) => {
-            event.preventDefault();
-            systray?.onRightClick?.(item.id);
-          });
-          icon.addEventListener("auxclick", (event) => {
-            if (event.button === 1) {
-              event.preventDefault();
-              systray?.onMiddleClick?.(item.id);
-            }
-          });
-          icon.addEventListener("mouseenter", () => systray?.onHoverEnter?.(item.id));
-          icon.addEventListener("mouseleave", () => systray?.onHoverLeave?.(item.id));
-
-          let pendingHoverMove = false;
-          icon.addEventListener("mousemove", () => {
-            if (pendingHoverMove) return;
-            pendingHoverMove = true;
-            requestAnimationFrame(() => {
-              pendingHoverMove = false;
-              systray?.onHoverMove?.(item.id);
-            });
-          });
-
-          return icon;
-        }));
-
-        if (items.length > visibleItems.length) {
+        if (items.length > compactItems.length) {
           const more = document.createElement("span");
           more.className = "tray-more";
-          more.title = `${items.length - visibleItems.length} hidden tray icons`;
-          more.textContent = `+${items.length - visibleItems.length}`;
+          more.title = `${items.length - compactItems.length} tray icons in dropdown`;
+          more.textContent = `+${items.length - compactItems.length}`;
           elements.tray.append(more);
         }
+
+        setClassFlag(elements.trayDrawer, "expanded", isTrayExpanded);
+        elements.trayToggle.title = items.length ? `${isTrayExpanded ? "Hide" : "Show"} all ${items.length} tray icons` : "No tray icons";
+        setText(elements.trayToggle, isTrayExpanded ? "▾" : "▴");
+      }
+
+      function createTrayIcon(item, systray) {
+        const icon = document.createElement("span");
+        icon.className = "tray-icon";
+        icon.dataset.trayIcon = item.id;
+        icon.title = item.tooltip ?? item.title ?? "";
+
+        if (item.iconUrl) {
+          const image = document.createElement("img");
+          image.src = item.iconUrl;
+          image.alt = "";
+          icon.append(image);
+        } else {
+          icon.textContent = item.icon ?? "●";
+        }
+
+        icon.addEventListener("click", () => systray?.onLeftClick?.(item.id));
+        icon.addEventListener("dblclick", () => systray?.onLeftDoubleClick?.(item.id));
+        icon.addEventListener("contextmenu", (event) => {
+          event.preventDefault();
+          systray?.onRightClick?.(item.id);
+        });
+        icon.addEventListener("auxclick", (event) => {
+          if (event.button === 1) {
+            event.preventDefault();
+            systray?.onMiddleClick?.(item.id);
+          }
+        });
+        icon.addEventListener("mouseenter", () => systray?.onHoverEnter?.(item.id));
+        icon.addEventListener("mouseleave", () => systray?.onHoverLeave?.(item.id));
+
+        let pendingHoverMove = false;
+        icon.addEventListener("mousemove", () => {
+          if (pendingHoverMove) return;
+          pendingHoverMove = true;
+          requestAnimationFrame(() => {
+            pendingHoverMove = false;
+            systray?.onHoverMove?.(item.id);
+          });
+        });
+
+        return icon;
       }
 
       function updateNetwork(network) {
@@ -487,7 +528,21 @@
           return;
         }
 
+        if (target.dataset.action === "tray-toggle") {
+          isTrayExpanded = !isTrayExpanded;
+          previousTraySignature = "";
+          updateTray(currentOutput.systray);
+          return;
+        }
+
         if (target.dataset.shell) runShellAction(target.dataset.shell);
+      });
+
+      document.addEventListener("click", (event) => {
+        if (!isTrayExpanded || event.target instanceof Node && elements.trayDrawer.contains(event.target)) return;
+        isTrayExpanded = false;
+        previousTraySignature = "";
+        updateTray(currentOutput.systray);
       });
 
       bar.addEventListener("auxclick", (event) => {

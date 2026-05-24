@@ -51,7 +51,7 @@ button {
 .bar {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) auto minmax(320px, 1fr);
+  grid-template-columns: minmax(180px, 1fr) max-content minmax(260px, 1fr);
   align-items: start;
   width: 100%;
   height: 34px;
@@ -84,6 +84,8 @@ button {
 .center {
   justify-self: center;
   gap: 4px;
+  width: max-content;
+  max-width: none;
   height: 31px;
   padding: 4px 10px 5px;
   border-radius: 0 0 45px 45px;
@@ -198,6 +200,12 @@ button {
   transform: translateY(0);
 }
 
+.tray-drawer:not(.expanded):hover .tray-panel {
+  opacity: 0;
+  pointer-events: none;
+  transform: none;
+}
+
 .from-left {
   left: 0;
 }
@@ -218,9 +226,12 @@ button {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .workspace {
+  flex: 0 0 auto;
   gap: 4px;
   min-width: 26px;
   padding: 0 5px;
@@ -242,10 +253,11 @@ button {
 
 .workspace-windows {
   display: inline-flex;
+  flex: 0 0 auto;
   gap: 2px;
-  max-width: 64px;
-  overflow: hidden;
+  max-width: none;
   color: var(--blue);
+  white-space: nowrap;
 }
 
 .clock {
@@ -268,8 +280,37 @@ button {
   display: flex;
   align-items: center;
   gap: 2px;
-  max-width: 246px;
+  max-width: 116px;
   overflow: hidden;
+}
+
+.tray-drawer {
+  z-index: 30;
+}
+
+.tray-panel {
+  position: static;
+  display: none;
+  align-items: center;
+  gap: 4px;
+  max-width: none;
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  opacity: 1;
+  transform: none;
+}
+
+.tray-drawer.expanded .tray-panel {
+  display: flex;
+  pointer-events: auto;
+  transform: none;
+}
+
+.tray-drawer.expanded + .tray {
+  display: none;
 }
 
 .tray-icon {
@@ -350,7 +391,7 @@ button {
   color: var(--yellow);
 }
 
-.tray-flyout {
+.tray-toggle {
   color: var(--muted);
 }
 
@@ -360,7 +401,7 @@ button {
 
 @media (max-width: 1200px) {
   .bar {
-    grid-template-columns: minmax(160px, 1fr) auto minmax(220px, 1fr);
+    grid-template-columns: minmax(140px, 1fr) max-content minmax(200px, 1fr);
   }
 
   .player,
