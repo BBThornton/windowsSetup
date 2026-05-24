@@ -2,6 +2,7 @@
 param(
   [switch]$NoBackup,
   [switch]$NoAutoHotkeyStartup,
+  [switch]$CleanZebarBackups,
   [switch]$Start,
   [switch]$Restart
 )
@@ -16,6 +17,14 @@ $HyprwinRoot = Join-Path $InstallRoot "hyprwin"
 $StartupRoot = [Environment]::GetFolderPath("Startup")
 
 $Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+
+function Remove-ZebarBackups {
+  $BackupPattern = Join-Path $ZebarRoot "waybar-mirror.backup-*"
+  Get-ChildItem -Path $BackupPattern -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+    Remove-Item -LiteralPath $_.FullName -Recurse -Force
+    Write-Host "Removed Zebar backup: $($_.FullName)"
+  }
+}
 
 function Assert-SourceFile {
   param([Parameter(Mandatory)] [string]$Path)
@@ -37,6 +46,12 @@ function Backup-Path {
   param([Parameter(Mandatory)] [string]$Path)
 
   if ($NoBackup -or -not (Test-Path -LiteralPath $Path)) {
+    return
+  }
+
+  if ($CleanZebarBackups -and $Path -eq $ZebarPackTarget) {
+    Remove-Item -LiteralPath $Path -Recurse -Force
+    Write-Host "Removed existing Zebar pack: $Path"
     return
   }
 
@@ -73,27 +88,6 @@ function Install-Directory {
   Backup-Path -Path $Destination
   Copy-Item -LiteralPath $Source -Destination $Destination -Recurse -Force
   Write-Host "Installed directory: $Destination"
-}
-
-function Set-ZebarWidgetHtmlPath {
-  param([Parameter(Mandatory)] [string]$PackPath)
-
-  $ZpackPath = Join-Path $PackPath "zpack.json"
-  $IndexPath = Join-Path $PackPath "index.html"
-
-  Assert-SourceFile -Path $ZpackPath
-  Assert-SourceFile -Path $IndexPath
-
-  $Zpack = Get-Content -LiteralPath $ZpackPath -Raw | ConvertFrom-Json
-
-  foreach ($Widget in $Zpack.widgets) {
-    if ($Widget.htmlPath -eq "index.html" -or $Widget.htmlPath -eq ".\index.html" -or $Widget.htmlPath -eq "./index.html") {
-      $Widget.htmlPath = $IndexPath
-    }
-  }
-
-  $Zpack | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $ZpackPath -Encoding UTF8
-  Write-Host "Set Zebar htmlPath: $IndexPath"
 }
 
 function Resolve-AutoHotkey {
@@ -186,9 +180,12 @@ $AutoHotkeyStartSource = Join-Path $RepoRoot "start-alt-drag.ps1"
 $AutoHotkeyStartTarget = Join-Path $HyprwinRoot "start-alt-drag.ps1"
 $AutoHotkeyShortcut = Join-Path $StartupRoot "hyprwin-alt-drag.lnk"
 
+if ($CleanZebarBackups) {
+  Remove-ZebarBackups
+}
+
 Install-File -Source $GlazeConfigSource -Destination $GlazeConfigTarget
 Install-Directory -Source $ZebarPackSource -Destination $ZebarPackTarget
-Set-ZebarWidgetHtmlPath -PackPath $ZebarPackTarget
 Install-File -Source $AutoHotkeySource -Destination $AutoHotkeyTarget
 Install-File -Source $AutoHotkeyStartSource -Destination $AutoHotkeyStartTarget
 

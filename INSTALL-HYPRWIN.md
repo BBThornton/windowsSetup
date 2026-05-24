@@ -15,7 +15,7 @@ alt-drag.ahk        -> %USERPROFILE%\.glzr\hyprwin\alt-drag.ahk
 start-alt-drag.ps1  -> %USERPROFILE%\.glzr\hyprwin\start-alt-drag.ps1
 ```
 
-During install it rewrites the Zebar pack's `htmlPath` to the absolute installed `index.html` path required by Zebar.
+The Zebar pack follows the official v3 format with `htmlPath` set to `./index.html`.
 
 By default it also creates a Startup folder shortcut for the AutoHotkey alt-drag helper:
 
@@ -30,6 +30,7 @@ Useful options:
 .\install-hyprwin.ps1 -Start
 .\install-hyprwin.ps1 -NoBackup
 .\install-hyprwin.ps1 -NoAutoHotkeyStartup
+.\install-hyprwin.ps1 -CleanZebarBackups
 ```
 
 To test the AutoHotkey helper immediately:

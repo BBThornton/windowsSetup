@@ -27,7 +27,7 @@ That copies the pack to:
 %USERPROFILE%\.glzr\zebar\waybar-mirror
 ```
 
-The installer also rewrites `zpack.json` so `htmlPath` points at the absolute installed `index.html` path required by Zebar.
+The pack follows the official v3 format with `htmlPath` set to `./index.html`.
 
 Then open Zebar from the tray and enable:
 
