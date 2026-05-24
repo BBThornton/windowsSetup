@@ -92,7 +92,51 @@ function Install-Directory {
   Write-Host "Installed directory: $Destination"
 }
 
+function Test-JetBrainsMonoNerdFontInstalled {
+  $RegistryPaths = @(
+    "HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts",
+    "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Fonts"
+  )
+
+  foreach ($RegistryPath in $RegistryPaths) {
+    if (Test-Path -LiteralPath $RegistryPath) {
+      $FontRegistry = Get-ItemProperty -LiteralPath $RegistryPath
+      $RegisteredFont = $FontRegistry.PSObject.Properties |
+        Where-Object { $_.Name -like "*JetBrainsMono*Nerd*Font*" -or $_.Value -like "*JetBrainsMono*Nerd*Font*" } |
+        Select-Object -First 1
+
+      if ($RegisteredFont) {
+        return $true
+      }
+    }
+  }
+
+  $FontFolders = @(
+    (Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Fonts"),
+    (Join-Path $env:WINDIR "Fonts")
+  )
+
+  foreach ($FontFolder in $FontFolders) {
+    if (Test-Path -LiteralPath $FontFolder) {
+      $FontFile = Get-ChildItem -LiteralPath $FontFolder -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like "*JetBrainsMono*Nerd*Font*.ttf" -or $_.Name -like "*JetBrainsMono*Nerd*Font*.otf" } |
+        Select-Object -First 1
+
+      if ($FontFile) {
+        return $true
+      }
+    }
+  }
+
+  return $false
+}
+
 function Install-JetBrainsMonoNerdFont {
+  if (Test-JetBrainsMonoNerdFontInstalled) {
+    Write-Host "JetBrainsMono Nerd Font is already installed. Skipping font download."
+    return
+  }
+
   $FontInstallRoot = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Fonts"
   $TempRoot = Join-Path ([IO.Path]::GetTempPath()) "hyprwin-fonts-$Timestamp"
   $ZipPath = Join-Path $TempRoot "JetBrainsMono.zip"
