@@ -31,6 +31,7 @@ Useful options:
 .\install-hyprwin.ps1 -NoBackup
 .\install-hyprwin.ps1 -NoAutoHotkeyStartup
 .\install-hyprwin.ps1 -NoFontInstall
+.\install-hyprwin.ps1 -ForceFontInstall
 .\install-hyprwin.ps1 -CleanZebarBackups
 ```
 
@@ -55,4 +56,4 @@ Requirements:
 - AutoHotkey v2 installed if you want `alt-drag.ahk`.
 - Internet access for the default JetBrainsMono Nerd Font install.
 
-The installer downloads JetBrainsMono Nerd Font from the Nerd Fonts GitHub release URL and installs it for the current Windows user. Use `-NoFontInstall` to skip that step.
+The installer downloads JetBrainsMono Nerd Font from the Nerd Fonts GitHub release URL and installs it for the current Windows user. Use `-NoFontInstall` to skip that step or `-ForceFontInstall` to repair/reinstall it.

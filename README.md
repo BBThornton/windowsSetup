@@ -24,7 +24,7 @@ The installer backs up existing targets, then copies:
 - `waybar-mirror\` to `%USERPROFILE%\.glzr\zebar\waybar-mirror\`
 - `alt-drag.ahk` to `%USERPROFILE%\.glzr\hyprwin\alt-drag.ahk`
 
-It also installs JetBrainsMono Nerd Font for the current Windows user unless `-NoFontInstall` is passed.
+It also installs JetBrainsMono Nerd Font for the current Windows user unless `-NoFontInstall` is passed. Use `-ForceFontInstall` to repair a bad or stale font install.
 
 ## After Install
 

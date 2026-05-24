@@ -3,6 +3,7 @@ param(
   [switch]$NoBackup,
   [switch]$NoAutoHotkeyStartup,
   [switch]$NoFontInstall,
+  [switch]$ForceFontInstall,
   [switch]$CleanZebarBackups,
   [switch]$Start,
   [switch]$Restart
@@ -97,32 +98,48 @@ function Test-JetBrainsMonoNerdFontInstalled {
     "HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts",
     "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Fonts"
   )
-
-  foreach ($RegistryPath in $RegistryPaths) {
-    if (Test-Path -LiteralPath $RegistryPath) {
-      $FontRegistry = Get-ItemProperty -LiteralPath $RegistryPath
-      $RegisteredFont = $FontRegistry.PSObject.Properties |
-        Where-Object { $_.Name -like "*JetBrainsMono*Nerd*Font*" -or $_.Value -like "*JetBrainsMono*Nerd*Font*" } |
-        Select-Object -First 1
-
-      if ($RegisteredFont) {
-        return $true
-      }
-    }
-  }
+  $RequiredFontPatterns = @(
+    "*JetBrainsMonoNerdFont-Regular*.ttf",
+    "*JetBrainsMonoNerdFont-Bold*.ttf"
+  )
 
   $FontFolders = @(
     (Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Fonts"),
     (Join-Path $env:WINDIR "Fonts")
   )
 
-  foreach ($FontFolder in $FontFolders) {
-    if (Test-Path -LiteralPath $FontFolder) {
-      $FontFile = Get-ChildItem -LiteralPath $FontFolder -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -like "*JetBrainsMono*Nerd*Font*.ttf" -or $_.Name -like "*JetBrainsMono*Nerd*Font*.otf" } |
+  $FoundRequiredFiles = 0
+
+  foreach ($Pattern in $RequiredFontPatterns) {
+    $FoundFileForPattern = $false
+
+    foreach ($FontFolder in $FontFolders) {
+      if ((Test-Path -LiteralPath $FontFolder) -and (Get-ChildItem -LiteralPath $FontFolder -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -like $Pattern } | Select-Object -First 1)) {
+        $FoundFileForPattern = $true
+        break
+      }
+    }
+
+    if ($FoundFileForPattern) {
+      $FoundRequiredFiles += 1
+    }
+  }
+
+  if ($FoundRequiredFiles -lt $RequiredFontPatterns.Count) {
+    return $false
+  }
+
+  foreach ($RegistryPath in $RegistryPaths) {
+    if (Test-Path -LiteralPath $RegistryPath) {
+      $FontRegistry = Get-ItemProperty -LiteralPath $RegistryPath
+      $RegisteredFont = $FontRegistry.PSObject.Properties |
+        Where-Object {
+          ($_.Name -eq "JetBrainsMono Nerd Font (TrueType)" -or $_.Name -like "JetBrainsMono Nerd Font*Regular*") -and
+          $_.Value -like "*JetBrainsMonoNerdFont-Regular*.ttf"
+        } |
         Select-Object -First 1
 
-      if ($FontFile) {
+      if ($RegisteredFont) {
         return $true
       }
     }
@@ -150,7 +167,7 @@ function Install-FontFile {
 }
 
 function Install-JetBrainsMonoNerdFont {
-  if (Test-JetBrainsMonoNerdFontInstalled) {
+  if (-not $ForceFontInstall -and (Test-JetBrainsMonoNerdFontInstalled)) {
     Write-Host "JetBrainsMono Nerd Font is already installed. Skipping font download."
     return
   }
@@ -173,7 +190,7 @@ function Install-JetBrainsMonoNerdFont {
     Where-Object {
       $_.Extension -in @(".ttf", ".otf") -and
       $_.BaseName -like "JetBrainsMonoNerdFont*" -and
-      $_.Name -match "Windows Compatible"
+      $_.FullName -match "Windows Compatible"
     }
 
   if (-not $FontFiles) {
