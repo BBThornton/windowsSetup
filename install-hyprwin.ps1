@@ -20,7 +20,7 @@ $StartupRoot = [Environment]::GetFolderPath("Startup")
 
 $Timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $JetBrainsMonoNerdFontUrl = "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip"
-$AltSnapUrl = "https://github.com/RamonUnch/AltSnap/releases/latest/download/AltSnap.exe"
+$AltSnapUrl = "https://api.github.com/repos/RamonUnch/AltSnap/releases/latest"
 
 function Remove-ZebarBackups {
   $BackupPattern = Join-Path $ZebarRoot "waybar-mirror.backup-*"
@@ -241,8 +241,19 @@ function Install-AltSnap {
 
   $Parent = Split-Path -Parent $Destination
   New-Item -ItemType Directory -Force -Path $Parent | Out-Null
-  Write-Host "Downloading AltSnap..."
-  Invoke-WebRequest -Uri $AltSnapUrl -OutFile $Destination
+
+  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+  Write-Host "Resolving latest AltSnap release..."
+  $Release = Invoke-RestMethod -Uri $AltSnapUrl -UseBasicParsing
+  $Asset = $Release.assets | Where-Object { $_.name -eq "AltSnap.exe" } | Select-Object -First 1
+
+  if (-not $Asset) {
+    throw "Could not find AltSnap.exe in the latest GitHub release. Check https://github.com/RamonUnch/AltSnap/releases"
+  }
+
+  Write-Host "Downloading AltSnap $($Release.tag_name)..."
+  Invoke-WebRequest -Uri $Asset.browser_download_url -OutFile $Destination -UseBasicParsing
   Write-Host "Installed AltSnap: $Destination"
 }
 
