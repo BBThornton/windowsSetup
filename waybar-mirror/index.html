@@ -37,9 +37,41 @@
           .replaceAll('"', "&quot;");
       }
 
-      function shell(program, args = "") {
-        if (zebar.shellSpawn) {
-          zebar.shellSpawn(program, args);
+      function spawnShell(program, args = "") {
+        if (!zebar.shellSpawn) {
+          console.warn("Zebar shellSpawn API is unavailable.", { program, args });
+          return;
+        }
+
+        try {
+          const result = zebar.shellSpawn(program, args);
+
+          if (result?.catch) {
+            result.catch(() => zebar.shellSpawn({ program, args }));
+          }
+        } catch (error) {
+          zebar.shellSpawn({ program, args });
+        }
+      }
+
+      function runShellAction(actionName) {
+        const actions = {
+          launcher: ["powershell", "-WindowStyle Hidden -Command Start-Process 'ms-windows-search:'"],
+          theme: ["explorer", "ms-settings:personalization-colors"],
+          files: ["explorer", ""],
+          terminal: ["wt", ""],
+          browser: ["explorer", "https://"],
+          settings: ["explorer", "ms-settings:"],
+          notifications: ["explorer", "ms-actioncenter:"],
+          update: ["explorer", "ms-settings:windowsupdate"],
+          wifi: ["powershell", "-WindowStyle Hidden -Command Start-Process 'ms-availablenetworks:'"],
+          nightlight: ["explorer", "ms-settings:nightlight"],
+          lock: ["rundll32.exe", "user32.dll,LockWorkStation"]
+        };
+        const [program, args] = actions[actionName] ?? [];
+
+        if (program) {
+          spawnShell(program, args);
         }
       }
 
@@ -231,15 +263,14 @@
             <span class="separator">·</span>
             <span class="module weather ${weatherTemp == null ? "muted" : ""}">${weatherLabel}</span>
             <span class="separator">·</span>
-            <button class="icon-button" title="Idle inhibitor placeholder"></button>
-            <button class="hint" data-shell="hint" title="Keybind hints">󰺁 HINT!</button>
+            <span class="icon-button" title="Idle inhibitor placeholder"></span>
           </section>
 
           <section class="right">
             <div class="tray">${renderTray(output.systray)}</div>
-            <span class="module network" title="${escapeHtml(networkInterface?.name ?? "Network")}">
+            <button class="module network" data-shell="wifi" title="Open Wi-Fi networks">
               ${getNetworkIcon(networkInterface)} ${formatNetworkSpeed(tx, rx)}
-            </span>
+            </button>
             <span class="separator">·</span>
             <div class="drawer mobo-drawer">
               <span class="module temperature ${(output.cpu?.usage ?? 0) > 90 ? "critical" : ""}">󰈸</span>
@@ -268,67 +299,69 @@
             <button class="icon-button nightlight" data-shell="nightlight" title="Night light">󰖔</button>
             <span class="separator">·</span>
             <div class="drawer status-drawer">
-              <button class="icon-button power" data-shell="power" title="Power dialog">⏻</button>
+              <button class="icon-button lock" data-shell="lock" title="Lock workstation">󰌾</button>
               <div class="drawer-panel from-right">
-                <button class="icon-button" data-shell="lock" title="Lock">󰌾</button>
                 <span class="module keyboard ${capsActive ? "active" : ""}">󰪛 ${capsActive ? "" : ""}</span>
               </div>
             </div>
           </section>
         `;
 
-        attachEvents(output);
+        currentOutput = output;
       }
 
-      function attachEvents(output) {
-        bar.querySelectorAll("[data-workspace]").forEach((button) => {
-          button.addEventListener("click", () => runGlazeCommand(`focus-workspace ${button.dataset.workspace}`));
-        });
+      let currentOutput = providers.outputMap;
 
-        bar.querySelector(".workspaces")?.addEventListener("wheel", (event) => {
+      bar.addEventListener("click", (event) => {
+        const eventTarget = event.target instanceof Element ? event.target : event.target.parentElement;
+        const target = eventTarget?.closest("[data-workspace], [data-action], [data-tray-index], [data-shell]");
+
+        if (!target) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (target.dataset.workspace) {
+          runGlazeCommand(`focus-workspace ${target.dataset.workspace}`);
+          return;
+        }
+
+        if (target.dataset.trayIndex) {
+          const item = (currentOutput.systray?.items ?? currentOutput.systray?.icons ?? [])[Number(target.dataset.trayIndex)];
+          item?.onLeftClick?.();
+          return;
+        }
+
+        if (target.dataset.action === "media-play-pause") {
+          currentOutput.media?.playPause?.();
+          return;
+        }
+
+        if (target.dataset.action === "audio-mute") {
+          currentOutput.audio?.toggleMute?.();
+          return;
+        }
+
+        if (target.dataset.action === "mic-mute") {
+          currentOutput.audio?.toggleMute?.({ deviceType: "recording" });
+          return;
+        }
+
+        if (target.dataset.shell) {
+          runShellAction(target.dataset.shell);
+        }
+      });
+
+      bar.addEventListener("wheel", (event) => {
+        const eventTarget = event.target instanceof Element ? event.target : event.target.parentElement;
+
+        if (eventTarget?.closest(".workspaces")) {
+          event.preventDefault();
           runGlazeCommand(event.deltaY > 0 ? "focus-next-workspace" : "focus-prev-workspace");
-        });
-
-        bar.querySelector('[data-action="media-play-pause"]')?.addEventListener("click", () => {
-          output.media?.playPause?.();
-        });
-
-        bar.querySelector('[data-action="audio-mute"]')?.addEventListener("click", () => {
-          output.audio?.toggleMute?.();
-        });
-
-        bar.querySelector('[data-action="mic-mute"]')?.addEventListener("click", () => {
-          output.audio?.toggleMute?.({ deviceType: "recording" });
-        });
-
-        bar.querySelectorAll("[data-tray-index]").forEach((button) => {
-          button.addEventListener("click", () => {
-            const item = (output.systray?.items ?? output.systray?.icons ?? [])[Number(button.dataset.trayIndex)];
-            item?.onLeftClick?.();
-          });
-        });
-
-        bar.querySelectorAll("[data-shell]").forEach((button) => {
-          button.addEventListener("click", () => {
-            const actions = {
-              launcher: ["powershell", "-WindowStyle Hidden -Command Start-Process 'ms-windows-search:'"],
-              theme: ["explorer", "ms-settings:personalization-colors"],
-              files: ["explorer", ""],
-              terminal: ["wt", ""],
-              browser: ["explorer", "https://"],
-              settings: ["explorer", "ms-settings:"],
-              notifications: ["explorer", "ms-actioncenter:"],
-              update: ["explorer", "ms-settings:windowsupdate"],
-              hint: ["notepad", ""],
-              nightlight: ["explorer", "ms-settings:nightlight"],
-              power: ["shutdown", "/i"],
-              lock: ["rundll32.exe", "user32.dll,LockWorkStation"]
-            };
-            const [program, args] = actions[button.dataset.shell] ?? [];
-            if (program) shell(program, args);
-          });
-        });
-      }
+        }
+      });
 
       providers.onOutput(() => render({ ...providers.outputMap }));
       render(providers.outputMap);

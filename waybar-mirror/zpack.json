@@ -34,14 +34,6 @@
           {
             "program": "rundll32.exe",
             "argsRegex": ".*"
-          },
-          {
-            "program": "shutdown",
-            "argsRegex": ".*"
-          },
-          {
-            "program": "notepad",
-            "argsRegex": ".*"
           }
         ]
       },

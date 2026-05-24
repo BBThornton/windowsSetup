@@ -109,7 +109,6 @@ button {
 
 .module,
 .icon-button,
-.hint,
 .player,
 .workspace,
 .tray-button {
@@ -125,11 +124,17 @@ button {
 
 .module:hover,
 .icon-button:hover,
-.hint:hover,
 .player:hover,
 .workspace:hover,
 .tray-button:hover {
   background: var(--surface);
+}
+
+[data-shell],
+[data-action],
+[data-workspace],
+[data-tray-index] {
+  cursor: pointer;
 }
 
 .separator {
@@ -265,10 +270,6 @@ button {
   color: var(--muted);
 }
 
-.hint {
-  color: var(--peach);
-}
-
 .tray {
   display: flex;
   align-items: center;
@@ -355,7 +356,7 @@ button {
   color: var(--yellow);
 }
 
-.power {
+.lock {
   color: var(--red);
 }
 
@@ -366,7 +367,6 @@ button {
 
   .player,
   .weather,
-  .hint,
   .cava {
     display: none;
   }
