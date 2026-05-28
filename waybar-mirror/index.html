@@ -52,6 +52,8 @@
         <div id="tray" class="tray"></div>
         <button id="network" class="module network" data-shell="wifi" title="Open Wi-Fi networks">󰌙 idle</button>
         <span class="separator">·</span>
+        <button id="bluetooth" class="icon-button bluetooth muted" title="Bluetooth">󰂲</button>
+        <span class="separator">·</span>
         <div class="drawer mobo-drawer">
           <button id="temperature" class="module temperature" data-shell="taskManager" title="Open Task Manager">󰈸</button>
           <div class="drawer-panel from-right">
@@ -59,9 +61,10 @@
             <span class="module power-profile"></span>
             <span id="memory" class="module memory">0.0G 󰾆</span>
             <span id="disk" class="module disk is-hidden"></span>
-            <span id="battery" class="module battery is-hidden"></span>
           </div>
         </div>
+        <span id="battery-sep" class="separator is-hidden">·</span>
+        <span id="battery" class="module battery is-hidden"></span>
         <span class="separator">|</span>
         <div class="drawer audio-drawer">
           <button id="audio" class="module audio" data-action="audio-toggle" title="Mute/unmute audio; right-click for sound settings">󰖁</button>
@@ -104,6 +107,8 @@
         audio: document.getElementById("audio"),
         awake: document.getElementById("awake"),
         battery: document.getElementById("battery"),
+        batterySep: document.getElementById("battery-sep"),
+        bluetooth: document.getElementById("bluetooth"),
         clock: document.getElementById("clock"),
         cpu: document.getElementById("cpu"),
         disk: document.getElementById("disk"),
@@ -128,6 +133,7 @@
       let previousAwakeSignature = "";
       let previousWorkspaceSignature = "";
       let previousTraySignature = "";
+      let previousBluetoothSignature = "";
       let isTrayExpanded = false;
       const visibleTrayIconCount = 4;
       const volumeStep = 5;
@@ -326,7 +332,16 @@
           /sound.*output/,
           /powertoys awake/,
           /power toys awake/,
-          /\bawake\b/
+          /\bawake\b/,
+          /\bbluetooth\b/,
+          /\bbattery\b/,
+          /altsnap/,
+          /screenconnect/,
+          /connectwise/,
+          /windows security/,
+          /it champion/,
+          /command palette/,
+          /windows search/
         ].some((pattern) => pattern.test(text));
       }
 
@@ -335,6 +350,48 @@
           const text = getTraySearchText(item);
           return /powertoys awake|power toys awake|\bawake\b/.test(text);
         });
+      }
+
+      function getBluetoothTrayIcon(systray) {
+        return (systray?.items ?? systray?.icons ?? []).find((item) => {
+          const text = getTraySearchText(item);
+          return /\bbluetooth\b/.test(text);
+        });
+      }
+
+      function updateBluetooth(systray) {
+        const item = getBluetoothTrayIcon(systray);
+        const signature = JSON.stringify(item ? [item.id, item.iconHash, item.iconUrl, item.tooltip ?? item.title] : null);
+        if (signature === previousBluetoothSignature) return;
+        previousBluetoothSignature = signature;
+
+        const btButton = elements.bluetooth.cloneNode(false);
+        elements.bluetooth.replaceWith(btButton);
+        elements.bluetooth = btButton;
+        elements.bluetooth.replaceChildren();
+
+        if (!item) {
+          elements.bluetooth.removeAttribute("data-tray-icon");
+          elements.bluetooth.title = "Bluetooth";
+          elements.bluetooth.textContent = "󰂲";
+          setClassFlag(elements.bluetooth, "muted", true);
+          return;
+        }
+
+        elements.bluetooth.dataset.trayIcon = item.id;
+        elements.bluetooth.title = item.tooltip ?? item.title ?? "Bluetooth";
+        setClassFlag(elements.bluetooth, "muted", false);
+
+        if (item.iconUrl) {
+          const image = document.createElement("img");
+          image.src = item.iconUrl;
+          image.alt = "";
+          elements.bluetooth.append(image);
+        } else {
+          elements.bluetooth.textContent = "󰂱";
+        }
+
+        wireTrayIconEvents(elements.bluetooth, item, systray);
       }
 
       function getWorkspaces(glazewm) {
@@ -354,6 +411,7 @@
         updateClock(output.date);
         updateWeather(output.weather);
         updateAwake(output.systray);
+        updateBluetooth(output.systray);
         updateTray(output.systray);
         updateNetwork(output.network);
         updateMobo(output);
@@ -562,6 +620,7 @@
         setHidden(elements.disk, diskUsage == null);
         if (diskUsage != null) setText(elements.disk, `${diskUsage}% 󰋊`);
 
+        setHidden(elements.batterySep, chargePercent == null);
         setHidden(elements.battery, chargePercent == null);
         if (chargePercent != null) {
           setText(elements.battery, `${getBatteryIcon(output.battery)} ${Math.round(chargePercent)}%`);
