@@ -9,6 +9,7 @@ Windows GlazeWM + Zebar setup that mirrors this machine's Hyprland/Waybar workfl
 - `alt-drag.ahk` - AutoHotkey v2 helper for Alt + mouse move/resize.
 - `start-alt-drag.ps1` - Direct launcher for testing the AutoHotkey helper.
 - `install-hyprwin.ps1` - Full installer for all of the above.
+- `terminal-mirror/` - Arch-on-WSL2 + Windows Terminal + PowerShell setup that mirrors this machine's zsh/terminal workflow. See `terminal-mirror/README.md`.
 
 ## Install
 

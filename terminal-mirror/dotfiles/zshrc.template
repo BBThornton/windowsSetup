@@ -1,0 +1,38 @@
+# Installed by terminal-mirror/setup-arch-shell.sh -- edit freely after that.
+# This is a clean rebuild of the prompt/plugin/alias setup, not a copy of any
+# machine-specific .zshrc, so it carries no local paths, exports, or secrets.
+
+export ZSH="$HOME/.oh-my-zsh"
+
+ZSH_THEME="agnosterzak"
+
+plugins=(
+    git
+    archlinux
+    zsh-autosuggestions
+    zsh-syntax-highlighting
+    history-substring-search
+)
+
+source $ZSH/oh-my-zsh.sh
+
+# Icons for files/directories in listings
+alias ls='lsd'
+alias l='ls -l'
+alias la='ls -a'
+alias lla='ls -la'
+alias lt='ls --tree'
+
+# Fuzzy history search (Ctrl+R) and completion
+[ -f /usr/share/fzf/key-bindings.zsh ] && source /usr/share/fzf/key-bindings.zsh
+[ -f /usr/share/fzf/completion.zsh ] && source /usr/share/fzf/completion.zsh
+
+HISTFILE=~/.zsh_history
+HISTSIZE=10000
+SAVEHIST=10000
+setopt appendhistory
+
+alias clear-yay='yay -Sc'
+alias file-mgr='ncdu'
+
+export PATH="$HOME/.local/bin:$PATH"
